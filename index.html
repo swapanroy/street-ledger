@@ -28,6 +28,7 @@
     color:var(--ink);
     font-family:'Public Sans', sans-serif;
     -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
   }
   .wrap{
     max-width:920px;
@@ -374,6 +375,46 @@
   }
   @media (max-width:640px){
     table{ min-width:640px; }
+  }
+
+  /* Tablet & phone adjustments */
+  @media (max-width:700px){
+    .wrap{ padding:22px 14px 60px; }
+    header.top{ flex-wrap:wrap; row-gap:10px; }
+    .brand{ font-size:25px; }
+    .capture-card{ padding:18px 16px; }
+    .capture-head{ font-size:18px; }
+    .capture-sub{ font-size:12.5px; }
+    .btn{ font-size:13px; padding:10px 14px; }
+    .ledger-title{ font-size:18px; }
+    .bulk-bar{ gap:8px; }
+    .bulk-bar label{ font-size:12px; }
+    thead th{ font-size:10.5px; padding:9px 8px; }
+    tbody td{ padding:10px 8px; font-size:13px; }
+    td.produce{ font-size:14px; }
+    input[type=checkbox]{ width:19px; height:19px; }
+    .settings-row input[type=password],
+    .settings-row input[type=text]{ min-width:140px; }
+    .settings-panel{ padding:16px; }
+    .settings-head{ font-size:16px; }
+    .store-prompt{ padding:14px; }
+    .store-prompt input[type=text]{ min-width:140px; }
+  }
+
+  @media (max-width:460px){
+    header.top{ flex-direction:column; align-items:flex-start; gap:8px; }
+    #settingsBtn{ align-self:flex-start; }
+    .capture-controls{ flex-direction:column; align-items:stretch; }
+    .capture-controls .btn{ width:100%; text-align:center; }
+    .preview-row{ flex-direction:column; align-items:flex-start; }
+    .thumb{ width:100%; height:auto; max-height:220px; }
+    .settings-row{ flex-direction:column; align-items:stretch; }
+    .settings-row select,
+    .settings-row input,
+    .settings-row button{ width:100%; }
+    .store-prompt{ flex-direction:column; align-items:stretch; }
+    .store-prompt-actions{ flex-direction:column; }
+    .store-prompt-actions .btn{ width:100%; }
   }
 
   /* Settings panel */
