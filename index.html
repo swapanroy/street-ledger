@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stall Ledger — Produce Price Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#FAF6EC;
+    --paper-dark:#F1EADA;
+    --leaf:#223B26;
+    --leaf-soft:#33513A;
+    --marigold:#E8A33D;
+    --marigold-dark:#C9852A;
+    --radish:#C1443C;
+    --radish-dark:#A2352E;
+    --sage:#7A8B6F;
+    --ink:#1B1B18;
+    --line: rgba(27,27,24,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:920px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+  }
+  header.top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:28px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+  }
+  .brand{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:-0.01em;
+    color:var(--leaf);
+  }
+  .brand span{ color:var(--marigold-dark); }
+  .tagline{
+    font-size:12.5px;
+    color:var(--sage);
+    font-family:'IBM Plex Mono', monospace;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+
+  /* Capture card */
+  .capture-card{
+    background:var(--leaf);
+    border-radius:18px;
+    padding:26px;
+    color:var(--paper);
+    position:relative;
+    overflow:hidden;
+    margin-bottom:28px;
+  }
+  .capture-card::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:14px;
+    background:
+      radial-gradient(circle at 10px 0, transparent 8px, var(--paper) 8.5px) top left/20px 14px repeat-x;
+  }
+  .capture-head{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .capture-sub{
+    font-size:13px;
+    color:#C9D6C4;
+    margin:0 0 18px;
+  }
+  .capture-controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+  }
+  input[type=file]{ display:none; }
+  .btn{
+    font-family:'Public Sans', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:9px;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--marigold); color:var(--leaf); }
+  .btn-primary:hover{ filter:brightness(1.06); }
+  .btn-primary[disabled]{ opacity:.5; cursor:not-allowed; }
+  .btn-ghost{ background:rgba(255,255,255,0.12); color:var(--paper); }
+  .btn-ghost:hover{ background:rgba(255,255,255,0.2); }
+  .btn-danger{ background:var(--radish); color:#fff; }
+  .btn-danger:hover{ filter:brightness(1.06); }
+  .btn-danger[disabled]{ opacity:.4; cursor:not-allowed; }
+  .btn-outline{
+    background:transparent;
+    border:1.5px solid var(--line);
+    color:var(--ink);
+  }
+  .btn-outline:hover{ background:var(--paper-dark); }
+  .btn-outline[disabled]{ opacity:.4; cursor:not-allowed; }
+
+  .preview-row{
+    margin-top:18px;
+    display:flex;
+    gap:14px;
+    align-items:center;
+  }
+  .thumb{
+    width:88px; height:88px;
+    object-fit:cover;
+    border-radius:10px;
+    border:2px solid rgba(255,255,255,0.25);
+  }
+  .status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:#DDE7D6;
+  }
+  .status.err{ color:#FFC9C4; }
+
+  /* Ledger */
+  .ledger-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:10px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .ledger-title{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:600;
+    color:var(--leaf);
+    margin:0;
+  }
+  .ledger-count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--sage);
+  }
+  .bulk-bar{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+    align-items:center;
+    font-size:13px;
+  }
+  .bulk-bar label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    margin-right:auto;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    background:#fff;
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 1px 0 var(--line);
+  }
+  thead th{
+    background:var(--leaf);
+    color:var(--paper);
+    text-align:left;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:500;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    padding:11px 12px;
+  }
+  thead th.sortable{
+    cursor:pointer;
+    user-select:none;
+    white-space:nowrap;
+  }
+  thead th.sortable:hover{ background:var(--leaf-soft); }
+  thead th.sortable.active{ color:var(--marigold); }
+  thead th.chk, tbody td.chk{ width:36px; text-align:center; padding-left:14px; }
+  tbody tr{ border-bottom:1px solid var(--line); }
+  tbody tr:last-child{ border-bottom:none; }
+  tbody tr.selected{ background:#FBF0DC; }
+  tbody td{
+    padding:12px;
+    font-size:14px;
+    vertical-align:middle;
+  }
+  td.store{ color:var(--sage); font-size:12.5px; }
+  td.store.editable{
+    cursor:pointer;
+    border-radius:6px;
+    transition:background .12s ease;
+  }
+  td.store.editable:hover{
+    background:var(--paper-dark);
+  }
+  td.store.editable:hover .store-text::after{
+    content:"✎";
+    margin-left:6px;
+    font-size:11px;
+    color:var(--marigold-dark);
+  }
+  .store-empty{
+    color:var(--line);
+    font-style:italic;
+  }
+  .store-edit-input{
+    font-family:'Public Sans', sans-serif;
+    font-size:12.5px;
+    padding:5px 7px;
+    border-radius:6px;
+    border:1.5px solid var(--marigold-dark);
+    width:100%;
+    max-width:140px;
+    background:#fff;
+  }
+  .store-edit-input:focus{ outline:none; }
+  td.produce{ font-family:'Fraunces', serif; font-weight:600; font-size:15px; color:var(--ink); }
+  td.date{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--sage); white-space:nowrap; }
+  .price-tag{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    font-weight:600;
+    color:var(--leaf);
+    background:var(--paper-dark);
+    border:1px dashed var(--sage);
+    border-radius:6px;
+    padding:3px 9px;
+    transform:rotate(-1.5deg);
+  }
+  .price-tag.empty{
+    color:var(--line);
+    border-style:dotted;
+    font-weight:400;
+  }
+  input[type=checkbox]{
+    width:16px; height:16px;
+    accent-color:var(--radish);
+    cursor:pointer;
+  }
+  .empty-state{
+    text-align:center;
+    padding:48px 20px;
+    color:var(--sage);
+    font-size:14px;
+  }
+  .empty-state strong{
+    display:block;
+    font-family:'Fraunces', serif;
+    font-size:17px;
+    color:var(--leaf);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  thead th.photo, tbody td.photo{ width:52px; text-align:center; }
+  .photo-thumb{
+    width:38px; height:38px;
+    object-fit:cover;
+    border-radius:7px;
+    border:1.5px solid var(--line);
+    cursor:pointer;
+    display:block;
+    margin:0 auto;
+    transition:transform .12s ease;
+  }
+  .photo-thumb:hover{ transform:scale(1.08); }
+  .no-photo{
+    width:38px; height:38px;
+    border-radius:7px;
+    border:1.5px dashed var(--line);
+    margin:0 auto;
+  }
+
+  /* Lightbox */
+  .lightbox-overlay{
+    position:fixed; inset:0;
+    background:rgba(20,20,16,0.8);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:24px;
+    cursor:zoom-out;
+  }
+  .lightbox-overlay.open{ display:flex; }
+  .lightbox-overlay img{
+    max-width:92vw;
+    max-height:88vh;
+    border-radius:12px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  /* Store name prompt */
+  .store-prompt{
+    display:none;
+    background:var(--paper-dark);
+    border:1.5px solid var(--marigold);
+    border-radius:12px;
+    padding:16px 18px;
+    margin-bottom:20px;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .store-prompt.open{ display:flex; }
+  .store-prompt-text{
+    flex:1 1 220px;
+  }
+  .store-prompt-text strong{
+    display:block;
+    font-family:'Fraunces', serif;
+    font-size:15.5px;
+    color:var(--leaf);
+    font-weight:600;
+    margin-bottom:2px;
+  }
+  .store-prompt-text span{
+    font-size:12.5px;
+    color:var(--sage);
+  }
+  .store-prompt input[type=text]{
+    font-family:'Public Sans', sans-serif;
+    font-size:14px;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    min-width:180px;
+    flex:1 1 180px;
+  }
+  .store-prompt input[type=text]:focus{
+    outline:none;
+    border-color:var(--marigold-dark);
+  }
+  .store-prompt-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .table-scroll{
+    width:100%;
+    overflow-x:auto;
+    border-radius:12px;
+    box-shadow:0 1px 0 var(--line);
+  }
+  @media (max-width:640px){
+    table{ min-width:640px; }
+  }
+
+  /* Settings panel */
+  .settings-panel{
+    display:none;
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:20px;
+  }
+  .settings-panel.open{ display:block; }
+  .settings-head{
+    font-family:'Fraunces', serif;
+    font-size:17px;
+    font-weight:600;
+    color:var(--leaf);
+    margin:0 0 4px;
+  }
+  .settings-sub{
+    font-size:12.5px;
+    color:var(--sage);
+    margin:0 0 14px;
+    line-height:1.5;
+    max-width:560px;
+  }
+  .settings-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+  }
+  .settings-row select{
+    font-family:'Public Sans', sans-serif;
+    font-size:13.5px;
+    padding:9px 10px;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    background:#fff;
+    flex:0 0 auto;
+  }
+  .settings-row input[type=password],
+  .settings-row input[type=text]{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    flex:1 1 200px;
+    min-width:160px;
+  }
+  .settings-row input:focus{
+    outline:none;
+    border-color:var(--marigold-dark);
+  }
+  .settings-status{
+    margin-top:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--leaf);
+  }
+  .settings-status.err{ color:var(--radish); }
+  .settings-hint{
+    margin:6px 0 0;
+    font-size:11.5px;
+    color:var(--sage);
+    line-height:1.5;
+  }
+  .setup-steps{
+    margin:0 0 16px;
+    padding-left:20px;
+    font-size:13.5px;
+    line-height:1.7;
+    color:var(--ink);
+  }
+  .setup-steps li{ margin-bottom:2px; }
+  .btn-link{
+    background:none;
+    border:none;
+    padding:0;
+    margin-top:14px;
+    font-family:'Public Sans', sans-serif;
+    font-size:12.5px;
+    color:var(--sage);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .btn-link:hover{ color:var(--leaf); }
+  .advanced-provider{
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+  }
+  .advanced-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--sage);
+  }
+  footer.credit{
+    text-align:center;
+    margin-top:36px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--sage);
+  }
+  footer.credit a{
+    color:var(--leaf);
+    font-weight:600;
+    text-decoration:none;
+  }
+  footer.credit a:hover{ text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="brand">Stall <span>Ledger</span></div>
+      <div class="tagline">Snap a shelf, log the price</div>
+    </div>
+    <button class="btn btn-outline" id="settingsBtn">Connect AI</button>
+  </header>
+
+  <div class="settings-panel" id="settingsPanel">
+    <p class="settings-head">Let's connect an AI to read your photos</p>
+    <p class="settings-sub">This is a one-time, 2-minute setup. You'll get a free code from Google, paste it below, and you're done. Nobody but Google ever sees this code — not us.</p>
+
+    <ol class="setup-steps" id="setupSteps">
+      <li>Click the green button below — it opens Google's site in a new tab.</li>
+      <li>Sign in with any Google account (the same one you use for Gmail is fine).</li>
+      <li>Click <strong>"Create API key"</strong>, then copy the code it gives you.</li>
+      <li>Come back to this tab, paste the code in the box below, and click <strong>Connect</strong>.</li>
+    </ol>
+
+    <button class="btn btn-primary" id="getKeyBtn" type="button">Get my free code from Google ↗</button>
+
+    <div class="settings-row">
+      <input type="password" id="apiKeyInput" placeholder="Paste your code here">
+      <button class="btn btn-ghost" id="toggleKeyVisibility" type="button" title="Show/hide code">👁</button>
+      <button class="btn btn-primary" id="saveKeyBtn">Connect</button>
+    </div>
+    <div class="settings-status" id="settingsStatus"></div>
+
+    <button class="btn-link" id="advancedToggle" type="button">I'd rather use ChatGPT or Claude instead</button>
+    <div class="advanced-provider" id="advancedProvider" style="display:none;">
+      <label class="advanced-label" for="providerSelect">Which AI?</label>
+      <select id="providerSelect">
+        <option value="gemini">Google — Gemini</option>
+        <option value="anthropic">Anthropic — Claude</option>
+        <option value="openai">OpenAI — ChatGPT</option>
+      </select>
+      <p class="settings-hint" id="settingsHint"></p>
+    </div>
+  </div>
+
+  <div class="capture-card">
+    <p class="capture-head">Scan a price section</p>
+    <p class="capture-sub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
+    <div class="capture-controls">
+      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <button class="btn btn-primary" id="pickBtn">Take / choose photo</button>
+      <button class="btn btn-ghost" id="extractBtn" disabled>Extract prices</button>
+    </div>
+    <div class="preview-row" id="previewRow" style="display:none;">
+      <img id="thumb" class="thumb" alt="Selected produce photo preview">
+      <div class="status" id="statusMsg"></div>
+    </div>
+  </div>
+
+  <div class="store-prompt" id="storePrompt">
+    <div class="store-prompt-text">
+      <strong>Add a store name?</strong>
+      <span id="storePromptSub">These items don't have one yet.</span>
+    </div>
+    <input type="text" id="storeNameInput" placeholder="e.g. Green Valley Market">
+    <div class="store-prompt-actions">
+      <button class="btn btn-outline" id="applyStoreOneBtn">Apply to these items</button>
+      <button class="btn btn-primary" id="applyStoreAllBtn">Apply to all items</button>
+      <button class="btn btn-ghost" id="dismissStoreBtn" style="color:var(--ink); background:transparent;">Skip</button>
+    </div>
+  </div>
+
+  <div class="ledger-head">
+    <h2 class="ledger-title">Price ledger</h2>
+    <span class="ledger-count" id="rowCount">0 items</span>
+  </div>
+
+  <div class="bulk-bar">
+    <label><input type="checkbox" id="selectAll"> Select all</label>
+    <button class="btn btn-outline" id="setStoreSelectedBtn" disabled>Set store for selected</button>
+    <button class="btn btn-outline" id="removeSelectedBtn" disabled>Remove selected</button>
+    <button class="btn btn-danger" id="removeAllBtn" disabled>Remove all</button>
+    <button class="btn btn-outline" id="exportCsvBtn" disabled>Export CSV</button>
+    <button class="btn btn-primary" id="exportXlsxBtn" disabled>Export Excel</button>
+  </div>
+
+  <div class="table-scroll">
+  <table id="ledgerTable">
+    <thead>
+      <tr>
+        <th class="chk"></th>
+        <th class="photo">Photo</th>
+        <th class="sortable" data-sort="dateEntered">Date entered</th>
+        <th>Store</th>
+        <th class="sortable" data-sort="produce">Produce</th>
+        <th class="sortable" data-sort="priceItem">Price / item</th>
+        <th class="sortable" data-sort="priceWeight">Price / weight</th>
+      </tr>
+    </thead>
+    <tbody id="ledgerBody">
+    </tbody>
+  </table>
+  </div>
+
+  <div class="lightbox-overlay" id="lightbox">
+    <img id="lightboxImg" alt="Full-size produce shelf photo">
+  </div>
+  <div class="empty-state" id="emptyState">
+    <strong>No prices logged yet</strong>
+    Take a photo of a produce shelf above to get started.
+  </div>
+
+  <footer class="credit">
+    Built by Swapan Roy — <a href="https://linkedin.com/in/swapanroy" target="_blank" rel="noopener">connect on LinkedIn</a>
+  </footer>
+
+</div>
+
+<script>
+let items = [];   // {id, dateEntered, store, produce, priceItem, priceWeight, photoUrl, batchId}
+let selectedFile = null;
+let selectedFileDataUrl = null;
+let idCounter = 1;
+let batchCounter = 1;
+let lastBatchId = null;
+
+const fileInput = document.getElementById('fileInput');
+const pickBtn = document.getElementById('pickBtn');
+const extractBtn = document.getElementById('extractBtn');
+const previewRow = document.getElementById('previewRow');
+const thumb = document.getElementById('thumb');
+const statusMsg = document.getElementById('statusMsg');
+const ledgerBody = document.getElementById('ledgerBody');
+const emptyState = document.getElementById('emptyState');
+const rowCount = document.getElementById('rowCount');
+const selectAll = document.getElementById('selectAll');
+const removeSelectedBtn = document.getElementById('removeSelectedBtn');
+const removeAllBtn = document.getElementById('removeAllBtn');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightboxImg');
+const storePrompt = document.getElementById('storePrompt');
+const storePromptSub = document.getElementById('storePromptSub');
+const storeNameInput = document.getElementById('storeNameInput');
+const applyStoreOneBtn = document.getElementById('applyStoreOneBtn');
+const applyStoreAllBtn = document.getElementById('applyStoreAllBtn');
+const dismissStoreBtn = document.getElementById('dismissStoreBtn');
+const setStoreSelectedBtn = document.getElementById('setStoreSelectedBtn');
+let storePromptMode = 'batch'; // 'batch' | 'selected'
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const providerSelect = document.getElementById('providerSelect');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const toggleKeyVisibility = document.getElementById('toggleKeyVisibility');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const settingsStatus = document.getElementById('settingsStatus');
+const settingsHint = document.getElementById('settingsHint');
+const getKeyBtn = document.getElementById('getKeyBtn');
+const advancedToggle = document.getElementById('advancedToggle');
+const advancedProvider = document.getElementById('advancedProvider');
+const setupSteps = document.getElementById('setupSteps');
+
+let llmConfig = { provider: 'gemini', apiKey: '' };
+
+const providerInfo = {
+  gemini: {
+    label: 'Google — Gemini',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    getKeyLabel: 'Get my free code from Google ↗',
+    hint: 'Free, no card needed. From aistudio.google.com.',
+    steps: [
+      'Click the green button below — it opens Google\'s site in a new tab.',
+      'Sign in with any Google account (the same one you use for Gmail is fine).',
+      'Click <strong>"Create API key"</strong>, then copy the code it gives you.',
+      'Come back to this tab, paste the code in the box below, and click <strong>Connect</strong>.'
+    ]
+  },
+  anthropic: {
+    label: 'Anthropic — Claude',
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+    getKeyLabel: 'Get my code from Anthropic ↗',
+    hint: 'From console.anthropic.com — may ask for a card on file.',
+    steps: [
+      'Click the green button below — it opens Anthropic\'s site in a new tab.',
+      'Sign in or create an account.',
+      'Click <strong>"Create Key"</strong>, then copy the code it gives you.',
+      'Come back to this tab, paste the code in the box below, and click <strong>Connect</strong>.'
+    ]
+  },
+  openai: {
+    label: 'OpenAI — ChatGPT',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    getKeyLabel: 'Get my code from OpenAI ↗',
+    hint: 'From platform.openai.com — may ask for a card on file.',
+    steps: [
+      'Click the green button below — it opens OpenAI\'s site in a new tab.',
+      'Sign in or create an account.',
+      'Click <strong>"Create new secret key"</strong>, then copy the code it gives you.',
+      'Come back to this tab, paste the code in the box below, and click <strong>Connect</strong>.'
+    ]
+  }
+};
+
+function refreshProviderUI(){
+  const info = providerInfo[providerSelect.value];
+  getKeyBtn.textContent = info.getKeyLabel;
+  settingsHint.textContent = info.hint;
+  setupSteps.innerHTML = info.steps.map(s => `<li>${s}</li>`).join('');
+}
+refreshProviderUI();
+
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.classList.toggle('open');
+});
+
+providerSelect.addEventListener('change', refreshProviderUI);
+
+getKeyBtn.addEventListener('click', () => {
+  window.open(providerInfo[providerSelect.value].keyUrl, '_blank', 'noopener');
+});
+
+advancedToggle.addEventListener('click', () => {
+  const showing = advancedProvider.style.display !== 'none';
+  advancedProvider.style.display = showing ? 'none' : 'flex';
+  advancedToggle.textContent = showing ? "I'd rather use ChatGPT or Claude instead" : 'Using Google Gemini instead';
+});
+
+toggleKeyVisibility.addEventListener('click', () => {
+  apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+});
+
+saveKeyBtn.addEventListener('click', () => {
+  const key = apiKeyInput.value.trim();
+  if(!key){
+    settingsStatus.textContent = 'Paste your code in the box first.';
+    settingsStatus.classList.add('err');
+    return;
+  }
+  llmConfig = { provider: providerSelect.value, apiKey: key };
+  settingsStatus.classList.remove('err');
+  settingsStatus.textContent = `You're connected! Using ${providerInfo[providerSelect.value].label} — go ahead and scan a photo.`;
+});
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+const sortableHeaders = document.querySelectorAll('#ledgerTable thead th.sortable');
+const sortLabels = {
+  dateEntered: 'Date entered',
+  produce: 'Produce',
+  priceItem: 'Price / item',
+  priceWeight: 'Price / weight'
+};
+let sortState = { field: null, direction: 'asc' };
+
+pickBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  if(!file) return;
+  selectedFile = file;
+  selectedFileDataUrl = null;
+  extractBtn.disabled = true;
+  previewRow.style.display = 'flex';
+  thumb.src = '';
+  statusMsg.classList.remove('err');
+  statusMsg.textContent = 'Preparing photo…';
+
+  try{
+    const normalized = await normalizeImage(file);
+    selectedFileDataUrl = normalized;
+    thumb.src = normalized.thumb;
+    statusMsg.textContent = 'Photo ready — click "Extract prices"';
+    extractBtn.disabled = false;
+  }catch(err){
+    statusMsg.textContent = 'Could not read that photo (unsupported format) — try a JPG or PNG.';
+    statusMsg.classList.add('err');
+  }
+});
+
+function drawToDataUrl(img, maxDim, quality){
+  let { width, height } = img;
+  if(width > maxDim || height > maxDim){
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+function normalizeImage(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Full-res copy: kept large and high-quality so small price-tag text stays legible to the model and on zoom.
+        const full = drawToDataUrl(img, 2000, 0.92);
+        // Small copy: just for the row icon, so the ledger stays light.
+        const thumbSize = drawToDataUrl(img, 240, 0.75);
+        resolve({ full, thumb: thumbSize });
+      };
+      img.onerror = () => reject(new Error('unsupported-image'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('read-failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function todayStr(){
+  const d = new Date();
+  return d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+}
+
+const EXTRACTION_PROMPT =
+  "This photo shows a fresh produce shelf/section with price tags. " +
+  "Extract every distinct produce item you can read. " +
+  "For each item return: store (the store name if visible on a sign/tag, else empty string), " +
+  "produce (the item name), priceItem (price per item/each, as a plain string like \"$1.29\", or empty string if not shown), " +
+  "priceWeight (price per weight, as a plain string like \"$2.49/lb\", or empty string if not shown). " +
+  "Respond with ONLY a raw JSON array of objects with exactly these keys: store, produce, priceItem, priceWeight. " +
+  "No markdown fences, no preamble, no explanation — JSON only. If nothing is readable, return [].";
+
+async function callAnthropic(apiKey, base64, mediaType){
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+          { type: "text", text: EXTRACTION_PROMPT }
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  if(data.error){ throw new Error(data.error.message || 'Anthropic API error'); }
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if(!textBlock){ throw new Error('No response from Claude'); }
+  return textBlock.text;
+}
+
+async function callOpenAI(apiKey, dataUrl){
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: EXTRACTION_PROMPT },
+          { type: "image_url", image_url: { url: dataUrl } }
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  if(data.error){ throw new Error(data.error.message || 'OpenAI API error'); }
+  const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if(!text){ throw new Error('No response from GPT-4o'); }
+  return text;
+}
+
+async function callGemini(apiKey, base64, mediaType){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: EXTRACTION_PROMPT },
+          { inline_data: { mime_type: mediaType, data: base64 } }
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  if(data.error){ throw new Error(data.error.message || 'Gemini API error'); }
+  const text = data.candidates && data.candidates[0] && data.candidates[0].content &&
+               data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
+               data.candidates[0].content.parts[0].text;
+  if(!text){ throw new Error('No response from Gemini'); }
+  return text;
+}
+
+async function extractWithConfiguredProvider(dataUrl, base64, mediaType){
+  if(llmConfig.provider === 'openai'){
+    return await callOpenAI(llmConfig.apiKey, dataUrl);
+  }
+  if(llmConfig.provider === 'gemini'){
+    return await callGemini(llmConfig.apiKey, base64, mediaType);
+  }
+  return await callAnthropic(llmConfig.apiKey, base64, mediaType);
+}
+
+extractBtn.addEventListener('click', async () => {
+  if(!selectedFile) return;
+
+  if(!llmConfig.apiKey){
+    statusMsg.textContent = 'First, connect an AI up top — it only takes a minute.';
+    statusMsg.classList.add('err');
+    settingsPanel.classList.add('open');
+    return;
+  }
+
+  extractBtn.disabled = true;
+  pickBtn.disabled = true;
+  statusMsg.classList.remove('err');
+  statusMsg.textContent = 'Reading shelf tags…';
+
+  try{
+    const normalized = selectedFileDataUrl || await normalizeImage(selectedFile);
+    const base64 = normalized.full.split(',')[1];
+    const mediaType = 'image/jpeg';
+
+    const rawText = await extractWithConfiguredProvider(normalized.full, base64, mediaType);
+
+    let clean = rawText.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+    let parsed;
+    try{
+      parsed = JSON.parse(clean);
+    }catch(e){
+      throw new Error('Could not parse the response — try again or switch providers');
+    }
+
+    if(!Array.isArray(parsed) || parsed.length === 0){
+      statusMsg.textContent = 'No readable prices found in that photo — try a clearer shot.';
+      statusMsg.classList.add('err');
+    } else {
+      const entered = todayStr();
+      const enteredISO = new Date().toISOString().slice(0, 10);
+      const batchId = batchCounter++;
+      lastBatchId = batchId;
+      let missingStoreCount = 0;
+      parsed.forEach(p => {
+        const storeVal = (p.store || '').trim();
+        if(!storeVal) missingStoreCount++;
+        items.push({
+          id: idCounter++,
+          dateEntered: entered,
+          dateEnteredISO: enteredISO,
+          store: storeVal,
+          produce: (p.produce || 'Unknown item').trim(),
+          priceItem: (p.priceItem || '').trim(),
+          priceWeight: (p.priceWeight || '').trim(),
+          photoUrl: normalized.thumb,
+          photoFullUrl: normalized.full,
+          batchId: batchId,
+          selected: false
+        });
+      });
+      renderTable();
+      statusMsg.textContent = `Added ${parsed.length} item${parsed.length===1?'':'s'} to the ledger.`;
+
+      if(missingStoreCount > 0){
+        storePromptMode = 'batch';
+        storePromptSub.textContent = missingStoreCount === parsed.length
+          ? `No store name was visible on this photo.`
+          : `${missingStoreCount} of ${parsed.length} new items are missing a store name.`;
+        applyStoreOneBtn.textContent = 'Apply to these items';
+        storeNameInput.value = '';
+        storePrompt.classList.add('open');
+        storeNameInput.focus();
+      } else {
+        storePrompt.classList.remove('open');
+      }
+    }
+  }catch(err){
+    console.error(err);
+    const isNetworkErr = err instanceof TypeError;
+    statusMsg.textContent = isNetworkErr
+      ? 'Could not reach that provider from the browser (it may block direct requests). Try a different provider.'
+      : `Something went wrong: ${err.message || 'try again'}.`;
+    statusMsg.classList.add('err');
+  }finally{
+    extractBtn.disabled = false;
+    pickBtn.disabled = false;
+  }
+});
+
+function priceToNumber(str){
+  if(!str) return null;
+  const match = String(str).match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+function getSortedItems(){
+  if(!sortState.field) return items;
+  const field = sortState.field;
+  const dir = sortState.direction === 'asc' ? 1 : -1;
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    if(field === 'priceItem' || field === 'priceWeight'){
+      const va = priceToNumber(a[field]);
+      const vb = priceToNumber(b[field]);
+      if(va === null && vb === null) return 0;
+      if(va === null) return 1;   // items with no price always sort last
+      if(vb === null) return -1;
+      return (va - vb) * dir;
+    }
+    const va = (field === 'dateEntered' ? (a.dateEnteredISO || '') : (a[field] || '')).toString().toLowerCase();
+    const vb = (field === 'dateEntered' ? (b.dateEnteredISO || '') : (b[field] || '')).toString().toLowerCase();
+    if(va < vb) return -1 * dir;
+    if(va > vb) return 1 * dir;
+    return 0;
+  });
+  return sorted;
+}
+
+function updateSortHeaders(){
+  sortableHeaders.forEach(th => {
+    const field = th.dataset.sort;
+    const isActive = sortState.field === field;
+    th.classList.toggle('active', isActive);
+    const arrow = isActive ? (sortState.direction === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+    th.textContent = sortLabels[field] + arrow;
+  });
+}
+
+sortableHeaders.forEach(th => {
+  th.addEventListener('click', () => {
+    const field = th.dataset.sort;
+    if(sortState.field === field){
+      sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortState.field = field;
+      sortState.direction = 'asc';
+    }
+    updateSortHeaders();
+    renderTable();
+  });
+});
+
+updateSortHeaders();
+
+function itemsToRows(){
+  return getSortedItems().map(i => ({
+    'Date Entered': i.dateEntered,
+    'Store': i.store,
+    'Produce': i.produce,
+    'Price/Item': i.priceItem,
+    'Price/Weight': i.priceWeight
+  }));
+}
+
+function todayFileStamp(){
+  return new Date().toISOString().slice(0, 10);
+}
+
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeCsvValue(val){
+  const s = String(val ?? '');
+  if(/[",\n]/.test(s)){
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+exportCsvBtn.addEventListener('click', () => {
+  if(items.length === 0) return;
+  const rows = itemsToRows();
+  const headers = ['Date Entered', 'Store', 'Produce', 'Price/Item', 'Price/Weight'];
+  const lines = [headers.join(',')];
+  rows.forEach(r => lines.push(headers.map(h => escapeCsvValue(r[h])).join(',')));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `stall-ledger-${todayFileStamp()}.csv`);
+});
+
+exportXlsxBtn.addEventListener('click', () => {
+  if(items.length === 0) return;
+  if(typeof XLSX === 'undefined'){
+    statusMsg.textContent = 'Excel export library failed to load — try Export CSV instead.';
+    statusMsg.classList.add('err');
+    return;
+  }
+  const rows = itemsToRows();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ledger');
+  XLSX.writeFile(wb, `stall-ledger-${todayFileStamp()}.xlsx`);
+});
+
+function renderTable(){
+  ledgerBody.innerHTML = '';
+  if(items.length === 0){
+    emptyState.style.display = 'block';
+    document.getElementById('ledgerTable').style.display = 'none';
+  } else {
+    emptyState.style.display = 'none';
+    document.getElementById('ledgerTable').style.display = 'table';
+    getSortedItems().forEach(item => {
+      const tr = document.createElement('tr');
+      tr.className = item.selected ? 'selected' : '';
+      tr.innerHTML = `
+        <td class="chk"><input type="checkbox" data-id="${item.id}" ${item.selected ? 'checked' : ''}></td>
+        <td class="photo">${item.photoUrl ? `<img class="photo-thumb" src="${item.photoUrl}" data-full="${item.photoFullUrl || item.photoUrl}" data-id="${item.id}" alt="Shelf photo for ${escapeHtml(item.produce)}">` : `<div class="no-photo"></div>`}</td>
+        <td class="date">${item.dateEntered}</td>
+        <td class="store editable" data-id="${item.id}"><span class="store-text">${item.store ? escapeHtml(item.store) : '<span class="store-empty">Add store</span>'}</span></td>
+        <td class="produce">${escapeHtml(item.produce)}</td>
+        <td>${item.priceItem ? `<span class="price-tag">${escapeHtml(item.priceItem)}</span>` : `<span class="price-tag empty">—</span>`}</td>
+        <td>${item.priceWeight ? `<span class="price-tag">${escapeHtml(item.priceWeight)}</span>` : `<span class="price-tag empty">—</span>`}</td>
+      `;
+      ledgerBody.appendChild(tr);
+    });
+  }
+  rowCount.textContent = `${items.length} item${items.length===1?'':'s'}`;
+  updateBulkControls();
+
+  ledgerBody.querySelectorAll('.photo-thumb').forEach(img => {
+    img.addEventListener('error', () => {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'no-photo';
+      placeholder.title = 'Photo unavailable';
+      img.replaceWith(placeholder);
+    }, { once: true });
+  });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+ledgerBody.addEventListener('change', (e) => {
+  if(e.target.matches('input[type=checkbox]')){
+    const id = Number(e.target.dataset.id);
+    const item = items.find(i => i.id === id);
+    if(item){
+      item.selected = e.target.checked;
+      e.target.closest('tr').classList.toggle('selected', item.selected);
+      updateBulkControls();
+    }
+  }
+});
+
+ledgerBody.addEventListener('click', (e) => {
+  if(e.target.matches('.photo-thumb')){
+    lightboxImg.src = e.target.dataset.full || e.target.src;
+    lightbox.classList.add('open');
+    return;
+  }
+  const cell = e.target.closest('td.store.editable');
+  if(cell && !cell.querySelector('input')){
+    startEditStore(cell);
+  }
+});
+
+function startEditStore(cell){
+  const id = Number(cell.dataset.id);
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  const safeValue = (item.store || '').replace(/"/g, '&quot;');
+  cell.innerHTML = `<input type="text" class="store-edit-input" placeholder="Store name" value="${safeValue}">`;
+  const input = cell.querySelector('input');
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = () => {
+    if(committed) return;
+    committed = true;
+    item.store = input.value.trim();
+    renderTable();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter'){
+      input.blur();
+    } else if(ev.key === 'Escape'){
+      committed = true;
+      renderTable();
+    }
+  });
+}
+
+lightbox.addEventListener('click', () => {
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+});
+
+applyStoreOneBtn.addEventListener('click', () => {
+  const name = storeNameInput.value.trim();
+  if(!name) return;
+  if(storePromptMode === 'selected'){
+    items.forEach(i => { if(i.selected) i.store = name; });
+  } else {
+    if(lastBatchId === null) return;
+    items.forEach(i => { if(i.batchId === lastBatchId && !i.store) i.store = name; });
+  }
+  storePrompt.classList.remove('open');
+  renderTable();
+});
+
+applyStoreAllBtn.addEventListener('click', () => {
+  const name = storeNameInput.value.trim();
+  if(!name) return;
+  items.forEach(i => { i.store = name; });
+  storePrompt.classList.remove('open');
+  renderTable();
+});
+
+dismissStoreBtn.addEventListener('click', () => {
+  storePrompt.classList.remove('open');
+});
+
+setStoreSelectedBtn.addEventListener('click', () => {
+  const count = items.filter(i => i.selected).length;
+  if(count === 0) return;
+  storePromptMode = 'selected';
+  storePromptSub.textContent = `Set a store name for ${count} selected item${count===1?'':'s'}.`;
+  applyStoreOneBtn.textContent = 'Apply to selected';
+  storeNameInput.value = '';
+  storePrompt.classList.add('open');
+  storeNameInput.focus();
+});
+
+selectAll.addEventListener('change', () => {
+  items.forEach(i => i.selected = selectAll.checked);
+  renderTable();
+});
+
+removeSelectedBtn.addEventListener('click', () => {
+  items = items.filter(i => !i.selected);
+  selectAll.checked = false;
+  renderTable();
+});
+
+removeAllBtn.addEventListener('click', () => {
+  items = [];
+  selectAll.checked = false;
+  storePrompt.classList.remove('open');
+  renderTable();
+});
+
+function updateBulkControls(){
+  const anySelected = items.some(i => i.selected);
+  const allSelected = items.length > 0 && items.every(i => i.selected);
+  removeSelectedBtn.disabled = !anySelected;
+  setStoreSelectedBtn.disabled = !anySelected;
+  removeAllBtn.disabled = items.length === 0;
+  exportCsvBtn.disabled = items.length === 0;
+  exportXlsxBtn.disabled = items.length === 0;
+  selectAll.checked = allSelected;
+  selectAll.disabled = items.length === 0;
+}
+
+renderTable();
+settingsPanel.classList.add('open');
+</script>
+</body>
+</html>
