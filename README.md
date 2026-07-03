@@ -66,5 +66,4 @@ To deploy your own copy, fork this repo and enable **GitHub Pages** in the repo 
 Built by **Swapan Roy** — [GitHub](https://github.com/swapanroy)
 
 ## License
-
-MIT — do whatever you'd like with it.
+MIT
