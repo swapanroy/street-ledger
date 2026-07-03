@@ -539,8 +539,10 @@
     <p class="capture-head">Scan a price section</p>
     <p class="capture-sub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
     <div class="capture-controls">
-      <input type="file" id="fileInput" accept="image/*" capture="environment">
-      <button class="btn btn-primary" id="pickBtn">Take / choose photo</button>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="libraryInput" accept="image/*" style="display:none;">
+      <button class="btn btn-primary" id="cameraBtn">📷 Take a photo</button>
+      <button class="btn btn-outline" id="libraryBtn">🖼️ Choose from library</button>
       <button class="btn btn-ghost" id="extractBtn" disabled>Extract prices</button>
     </div>
     <div class="preview-row" id="previewRow" style="display:none;">
@@ -616,8 +618,10 @@ let idCounter = 1;
 let batchCounter = 1;
 let lastBatchId = null;
 
-const fileInput = document.getElementById('fileInput');
-const pickBtn = document.getElementById('pickBtn');
+const cameraInput = document.getElementById('cameraInput');
+const libraryInput = document.getElementById('libraryInput');
+const cameraBtn = document.getElementById('cameraBtn');
+const libraryBtn = document.getElementById('libraryBtn');
 const extractBtn = document.getElementById('extractBtn');
 const previewRow = document.getElementById('previewRow');
 const thumb = document.getElementById('thumb');
@@ -742,10 +746,10 @@ const sortLabels = {
 };
 let sortState = { field: null, direction: 'asc' };
 
-pickBtn.addEventListener('click', () => fileInput.click());
+cameraBtn.addEventListener('click', () => cameraInput.click());
+libraryBtn.addEventListener('click', () => libraryInput.click());
 
-fileInput.addEventListener('change', async () => {
-  const file = fileInput.files[0];
+async function handleFileSelected(file){
   if(!file) return;
   selectedFile = file;
   selectedFileDataUrl = null;
@@ -765,7 +769,10 @@ fileInput.addEventListener('change', async () => {
     statusMsg.textContent = 'Could not read that photo (unsupported format) — try a JPG or PNG.';
     statusMsg.classList.add('err');
   }
-});
+}
+
+cameraInput.addEventListener('change', () => handleFileSelected(cameraInput.files[0]));
+libraryInput.addEventListener('change', () => handleFileSelected(libraryInput.files[0]));
 
 function drawToDataUrl(img, maxDim, quality){
   let { width, height } = img;
@@ -914,7 +921,8 @@ extractBtn.addEventListener('click', async () => {
   }
 
   extractBtn.disabled = true;
-  pickBtn.disabled = true;
+  cameraBtn.disabled = true;
+  libraryBtn.disabled = true;
   statusMsg.classList.remove('err');
   statusMsg.textContent = 'Reading shelf tags…';
 
@@ -984,7 +992,8 @@ extractBtn.addEventListener('click', async () => {
     statusMsg.classList.add('err');
   }finally{
     extractBtn.disabled = false;
-    pickBtn.disabled = false;
+    cameraBtn.disabled = false;
+    libraryBtn.disabled = false;
   }
 });
 
