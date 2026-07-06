@@ -744,6 +744,15 @@ function setDbStatus(state, text){
   dbStatus.textContent = text;
 }
 
+function describeError(err){
+  if(!err) return 'Unknown error';
+  if(typeof err === 'string') return err;
+  const parts = [err.message, err.error_description, err.details, err.hint, err.code]
+    .filter(Boolean);
+  if(parts.length) return parts.join(' | ');
+  try{ return JSON.stringify(err); }catch(e){ return String(err); }
+}
+
 if(!supabaseClient){
   setDbStatus('offline', '⚪ Local only — shared database not configured');
 }
@@ -1686,8 +1695,8 @@ async function loadSharedLedger(){
     renderTable();
     setDbStatus('connected', `☁ Shared ledger connected — ${items.length} item${items.length===1?'':'s'} loaded`);
   }catch(err){
-    console.warn('[Stall Ledger] Could not load shared ledger:', err);
-    const isPermissionDenied = err && (err.code === '42501' || /permission denied|row-level security/i.test(err.message || ''));
+    console.warn('[Stall Ledger] Could not load shared ledger:', describeError(err), err);
+    const isPermissionDenied = err && (err.code === '42501' || /permission denied|row-level security/i.test(describeError(err)));
     if(isPermissionDenied){
       setDbStatus('offline', '🔒 Scans are saved — full ledger is admin-only');
     } else {
@@ -1713,7 +1722,7 @@ async function insertItemsToDb(newItems){
     (data || []).forEach((row, idx) => { if(newItems[idx]) newItems[idx].dbId = row.id; });
     setDbStatus('connected', '☁ Saved to shared ledger');
   }catch(err){
-    console.warn('[Stall Ledger] Could not save new items to shared ledger:', err);
+    console.warn('[Stall Ledger] Could not save new items to shared ledger:', describeError(err), err);
     setDbStatus('error', '⚠ Saved locally only — could not reach shared database');
   }
 }
@@ -1724,7 +1733,7 @@ async function updateStoreInDb(dbId, store){
     const { error } = await supabaseClient.from('ledger_items').update({ store }).eq('id', dbId);
     if(error) throw error;
   }catch(err){
-    console.warn('[Stall Ledger] Could not update store name in shared ledger:', err);
+    console.warn('[Stall Ledger] Could not update store name in shared ledger:', describeError(err), err);
   }
 }
 
@@ -1734,7 +1743,7 @@ async function deleteItemsFromDb(dbIds){
     const { error } = await supabaseClient.from('ledger_items').delete().in('id', dbIds);
     if(error) throw error;
   }catch(err){
-    console.warn('[Stall Ledger] Could not delete items from shared ledger:', err);
+    console.warn('[Stall Ledger] Could not delete items from shared ledger:', describeError(err), err);
   }
 }
 
@@ -1744,7 +1753,7 @@ async function deleteAllFromDb(){
     const { error } = await supabaseClient.from('ledger_items').delete().gte('id', 0);
     if(error) throw error;
   }catch(err){
-    console.warn('[Stall Ledger] Could not clear shared ledger:', err);
+    console.warn('[Stall Ledger] Could not clear shared ledger:', describeError(err), err);
   }
 }
 
