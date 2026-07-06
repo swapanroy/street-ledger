@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bargain Basket — Find Cheap Groceries Near You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2F7FB;
+    --card:#FFFFFF;
+    --ink:#1E2A33;
+    --plum:#2D7DD2;
+    --plum-dark:#1F5FA0;
+    --gold:#2AA7A0;
+    --gold-dark:#1F7D77;
+    --sage:#5B7A94;
+    --line: rgba(30,42,51,0.14);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Source Sans 3', sans-serif;
+    font-size:18px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:720px;
+    margin:0 auto;
+    padding:36px 22px 80px;
+  }
+  header{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .basket-hero{
+    width:110px;
+    height:auto;
+    margin-bottom:6px;
+    animation:heroPop 0.6s ease-out;
+  }
+  @keyframes heroPop{
+    0%{ opacity:0; transform:translateY(-8px) scale(0.94); }
+    100%{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .basket-hero{ animation:none; }
+  }
+  .brand{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:38px;
+    color:var(--plum);
+    margin:0 0 6px;
+  }
+  .brand span{ color:var(--gold-dark); }
+  .tagline{
+    font-size:19px;
+    color:var(--ink);
+    opacity:0.75;
+    margin:0;
+  }
+
+  .search-card{
+    background:var(--card);
+    border-radius:20px;
+    padding:28px 24px;
+    box-shadow:0 6px 0 var(--line), 0 10px 24px rgba(43,35,32,0.06);
+    border:1.5px solid var(--line);
+    margin-bottom:32px;
+    position:relative;
+    overflow:hidden;
+  }
+  .search-card::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:6px;
+    background:linear-gradient(90deg, var(--gold), var(--plum));
+  }
+  .step-header{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .step-badge{
+    flex-shrink:0;
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    background:var(--plum);
+    color:#fff;
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .search-label{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:22px;
+    margin:0;
+    color:var(--plum);
+  }
+  .btn{
+    font-family:'Source Sans 3', sans-serif;
+    font-weight:700;
+    font-size:19px;
+    border:none;
+    border-radius:14px;
+    padding:16px 20px;
+    cursor:pointer;
+    width:100%;
+    text-align:center;
+    transition:transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow:0 3px 0 rgba(0,0,0,0.12);
+  }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,0.12); }
+  .btn-primary{ background:var(--plum); color:#fff; }
+  .btn-primary:hover{ background:var(--plum-dark); }
+  .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  .or-divider{
+    text-align:center;
+    color:var(--ink);
+    opacity:0.55;
+    font-size:16px;
+    margin:16px 0;
+  }
+  input[type=text]{
+    width:100%;
+    font-family:'Source Sans 3', sans-serif;
+    font-size:19px;
+    padding:14px 16px;
+    border-radius:14px;
+    border:2px solid var(--line);
+    margin-bottom:12px;
+  }
+  input[type=text]:focus{
+    outline:none;
+    border-color:var(--gold);
+  }
+  .btn-secondary{
+    background:var(--paper);
+    color:var(--plum);
+    border:2px solid var(--plum);
+  }
+  .btn-secondary:hover{ background:#FDE9D0; }
+  .btn-large{
+    font-size:22px;
+    padding:20px;
+    margin-bottom:24px;
+  }
+  .location-confirm{
+    font-size:16px;
+    font-weight:600;
+    color:var(--sage);
+    margin:8px 0 0;
+    min-height:20px;
+  }
+  .step2-sub{
+    font-size:16px;
+    opacity:0.75;
+    margin:0 0 14px;
+  }
+  textarea{
+    width:100%;
+    font-family:'Source Sans 3', sans-serif;
+    font-size:18px;
+    padding:14px 16px;
+    border-radius:14px;
+    border:2px solid var(--line);
+    margin-bottom:8px;
+    resize:vertical;
+  }
+  textarea:focus{ outline:none; border-color:var(--gold); }
+  .photo-status{
+    font-size:15px;
+    color:var(--sage);
+    min-height:20px;
+    margin:8px 0 0;
+  }
+  .photo-status.err{ color:#8A3B32; font-weight:600; }
+  .ai-connect{
+    display:none;
+    margin-top:16px;
+    padding-top:16px;
+    border-top:1.5px dashed var(--line);
+  }
+  .ai-connect.open{ display:block; }
+  .ai-connect-label{
+    font-size:15px;
+    opacity:0.8;
+    margin:0 0 12px;
+  }
+  #geminiKeyInput{ margin-top:10px; }
+  .distance-row{
+    margin-top:18px;
+  }
+  .distance-label{
+    font-size:17px;
+    font-weight:600;
+    margin-bottom:10px;
+    display:block;
+  }
+  .distance-options{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .distance-pill{
+    flex:1 1 auto;
+    font-family:'Source Sans 3', sans-serif;
+    font-weight:700;
+    font-size:18px;
+    padding:12px 16px;
+    border-radius:12px;
+    border:2px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    cursor:pointer;
+    text-align:center;
+    min-width:90px;
+    transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .distance-pill.active{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:#fff;
+  }
+
+  .status-note{
+    text-align:center;
+    font-size:17px;
+    color:var(--ink);
+    opacity:0.7;
+    margin:20px 0;
+  }
+  .status-note.err{ color:#8A3B32; opacity:1; font-weight:600; }
+
+  .results-heading{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:26px;
+    color:var(--plum);
+    margin:8px 0 18px;
+  }
+
+  .produce-group{ margin-bottom:30px; }
+  .produce-name{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:22px;
+    margin:0 0 12px;
+    text-transform:capitalize;
+  }
+
+  .price-card{
+    position:relative;
+    background:var(--card);
+    border-radius:16px;
+    padding:20px 20px 20px 26px;
+    margin-bottom:14px;
+    border:1.5px solid var(--line);
+    box-shadow:0 3px 0 var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    transition:transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  /* Signature: a die-cut "price tag" notch on each card */
+  .price-card::before{
+    content:"";
+    position:absolute;
+    left:-1px;
+    top:22px;
+    width:16px;
+    height:16px;
+    background:var(--paper);
+    border:1.5px solid var(--line);
+    border-radius:50%;
+  }
+  .price-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 5px 12px rgba(43,35,32,0.1);
+  }
+  .price-card-main{ flex:1 1 220px; }
+  .price-card-store{
+    font-weight:700;
+    font-size:20px;
+    color:var(--ink);
+  }
+  .price-card-distance{
+    font-size:16px;
+    color:var(--sage);
+    font-weight:600;
+    margin-top:2px;
+  }
+  .price-tag{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:26px;
+    color:#fff;
+    background:var(--gold);
+    padding:8px 16px;
+    border-radius:10px;
+    white-space:nowrap;
+  }
+  .price-tag .unit{
+    font-size:15px;
+    font-family:'Source Sans 3', sans-serif;
+    font-weight:600;
+    opacity:0.9;
+  }
+
+  .trip-summary-card{
+    background:var(--card);
+    border-radius:20px;
+    padding:24px;
+    border:2px solid var(--gold);
+    box-shadow:0 5px 0 var(--line), 0 12px 28px rgba(43,35,32,0.08);
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .trip-summary-card.alt{ border-color:var(--sage); }
+  .best-ribbon{
+    position:absolute;
+    top:14px;
+    right:-32px;
+    background:var(--gold);
+    color:#fff;
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.06em;
+    padding:5px 40px;
+    transform:rotate(35deg);
+    box-shadow:0 2px 4px rgba(0,0,0,0.15);
+  }
+  .trip-store-name{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:24px;
+    color:var(--plum);
+  }
+  .trip-store-distance{
+    font-size:16px;
+    color:var(--sage);
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  .trip-coverage{
+    font-size:17px;
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .trip-total{
+    font-family:'Bitter', serif;
+    font-weight:700;
+    font-size:22px;
+    color:var(--gold-dark);
+    margin-bottom:14px;
+  }
+  .checklist{ margin-top:6px; }
+  .checklist-item{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    font-size:17px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .checklist-item:last-child{ border-bottom:none; }
+  .checklist-item.missing{ opacity:0.65; }
+  .alt-heading{ margin-top:6px; }
+  .empty-state{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink);
+    opacity:0.75;
+  }
+  .empty-state strong{
+    display:block;
+    font-family:'Bitter', serif;
+    font-size:22px;
+    color:var(--plum);
+    margin-bottom:8px;
+  }
+
+  .fallback-card{
+    background:var(--card);
+    border-radius:20px;
+    padding:24px;
+    border:1.5px solid var(--line);
+    box-shadow:0 4px 0 var(--line);
+    text-align:center;
+  }
+  .fallback-label{
+    font-size:17px;
+    font-weight:600;
+    margin:0 0 16px;
+  }
+  .fallback-card .btn{
+    display:block;
+    text-decoration:none;
+    margin-bottom:12px;
+  }
+  .fallback-note{
+    font-size:15px;
+    opacity:0.7;
+    margin:12px 0 0;
+    line-height:1.5;
+  }
+
+  .disclaimer{
+    margin-top:40px;
+    padding-top:20px;
+    border-top:1.5px solid var(--line);
+    font-size:15px;
+    color:var(--ink);
+    opacity:0.65;
+    text-align:center;
+    line-height:1.6;
+  }
+
+  @media (max-width:480px){
+    body{ font-size:17px; }
+    .brand{ font-size:30px; }
+    .price-tag{ font-size:22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="basket-hero" viewBox="0 0 160 120" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="80" cy="112" rx="58" ry="6" fill="var(--line)"/>
+      <path d="M28 55 L38 100 Q40 106 46 106 L114 106 Q120 106 122 100 L132 55 Z" fill="var(--gold)" opacity="0.15"/>
+      <path d="M28 55 L38 100 Q40 106 46 106 L114 106 Q120 106 122 100 L132 55 Z" stroke="var(--plum)" stroke-width="3" fill="none" stroke-linejoin="round"/>
+      <path d="M28 55 H132" stroke="var(--plum)" stroke-width="3"/>
+      <path d="M52 55 V40 Q52 22 80 22 Q108 22 108 40 V55" stroke="var(--plum)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <line x1="46" y1="63" x2="52" y2="98" stroke="var(--plum)" stroke-width="2" opacity="0.4"/>
+      <line x1="80" y1="63" x2="80" y2="98" stroke="var(--plum)" stroke-width="2" opacity="0.4"/>
+      <line x1="114" y1="63" x2="108" y2="98" stroke="var(--plum)" stroke-width="2" opacity="0.4"/>
+      <circle cx="66" cy="48" r="10" fill="#4C9A5B"/>
+      <circle cx="88" cy="44" r="12" fill="#E2543C"/>
+      <path d="M88 32 Q90 28 94 27" stroke="#4C9A5B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="106" cy="50" rx="9" ry="11" fill="#E8B23D"/>
+    </svg>
+    <p class="brand">Bargain <span>Basket</span></p>
+    <p class="tagline">No more running from store to store — find one at the right price, and go.</p>
+  </header>
+
+  <div class="search-card">
+    <div class="step-header">
+      <div class="step-badge">1</div>
+      <p class="search-label">Where do you live?</p>
+    </div>
+
+    <button class="btn btn-primary" id="useLocationBtn">📍 Use my current location</button>
+    <p class="or-divider">— or —</p>
+    <input type="text" id="addressInput" placeholder="Type your city or ZIP code">
+    <button class="btn btn-primary" id="setAddressBtn">Set this as my location</button>
+    <p class="location-confirm" id="locationConfirm"></p>
+
+    <div class="distance-row">
+      <label class="distance-label">How far are you willing to go?</label>
+      <div class="distance-options">
+        <button class="distance-pill" data-miles="5" type="button">5 miles</button>
+        <button class="distance-pill active" data-miles="10" type="button">10 miles</button>
+        <button class="distance-pill" data-miles="20" type="button">20 miles</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="search-card">
+    <div class="step-header">
+      <div class="step-badge">2</div>
+      <p class="search-label">What's on your list?</p>
+    </div>
+    <p class="step2-sub">Type your list below, or add a photo of a handwritten or printed list.</p>
+
+    <textarea id="listTextarea" rows="5" placeholder="e.g.&#10;tomatoes&#10;bananas&#10;eggs&#10;bread"></textarea>
+
+    <p class="or-divider">— or —</p>
+    <input type="file" id="listPhotoInput" accept="image/*" style="display:none;">
+    <button class="btn btn-secondary" id="listPhotoBtn">📷 Add a photo of your list</button>
+    <p class="photo-status" id="photoStatus"></p>
+
+    <div class="ai-connect" id="aiConnect">
+      <p class="ai-connect-label">Reading a photo needs a free connection to Google's AI (one-time, takes a minute).</p>
+      <button class="btn btn-secondary" id="getGeminiKeyBtn" type="button">Get my free code from Google ↗</button>
+      <input type="password" id="geminiKeyInput" placeholder="Paste your code here">
+      <button class="btn btn-primary" id="connectGeminiBtn" type="button">Connect</button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary btn-large" id="findTripBtn">🛒 Find my shopping trip</button>
+
+  <div class="status-note" id="statusNote"></div>
+  <div id="resultsArea"></div>
+
+  <div class="disclaimer">
+    Prices are shared by other shoppers and may change — use this as a helpful starting point, not an exact promise.
+  </div>
+
+</div>
+
+<script>
+const COMPARE_URL = 'https://script.google.com/macros/s/AKfycbzQVORlZPhXr4v7gIJGJLZsm-bMdildCHHRS97WuowbC_P_Tw8HARcLAfxqYi53pCaD/exec?action=compare';
+
+const useLocationBtn = document.getElementById('useLocationBtn');
+const addressInput = document.getElementById('addressInput');
+const setAddressBtn = document.getElementById('setAddressBtn');
+const locationConfirm = document.getElementById('locationConfirm');
+const listTextarea = document.getElementById('listTextarea');
+const listPhotoInput = document.getElementById('listPhotoInput');
+const listPhotoBtn = document.getElementById('listPhotoBtn');
+const photoStatus = document.getElementById('photoStatus');
+const aiConnect = document.getElementById('aiConnect');
+const getGeminiKeyBtn = document.getElementById('getGeminiKeyBtn');
+const geminiKeyInput = document.getElementById('geminiKeyInput');
+const connectGeminiBtn = document.getElementById('connectGeminiBtn');
+const findTripBtn = document.getElementById('findTripBtn');
+const statusNote = document.getElementById('statusNote');
+const resultsArea = document.getElementById('resultsArea');
+const distancePills = document.querySelectorAll('.distance-pill');
+
+let selectedMiles = 10;
+let geocodeCache = {};
+let currentUserLoc = null;
+let geminiApiKey = '';
+
+distancePills.forEach(pill => {
+  pill.addEventListener('click', () => {
+    distancePills.forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    selectedMiles = Number(pill.dataset.miles);
+  });
+});
+
+function setStatus(text, isError){
+  statusNote.textContent = text;
+  statusNote.className = 'status-note' + (isError ? ' err' : '');
+}
+
+function haversineMiles(lat1, lon1, lat2, lon2){
+  const R = 3958.8;
+  const toRad = deg => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function geocode(query){
+  const key = query.trim().toLowerCase();
+  if(!key) return null;
+  if(key in geocodeCache) return geocodeCache[key];
+  try{
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    const res = await fetch(url);
+    const data = await res.json();
+    const result = (data && data[0]) ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+    geocodeCache[key] = result;
+    return result;
+  }catch(err){
+    console.warn('[Bargain Basket] Geocoding failed for', query, err);
+    geocodeCache[key] = null;
+    return null;
+  }
+}
+
+function priceToNumber(str){
+  if(!str) return null;
+  const match = String(str).match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function renderEmptyState(heading, explanation){
+  const searchQuery = encodeURIComponent('grocery store weekly ad deals near me');
+  resultsArea.innerHTML = `
+    <div class="empty-state">
+      <strong>${escapeHtml(heading)}</strong>
+      ${escapeHtml(explanation)}
+    </div>
+    <div class="fallback-card">
+      <p class="fallback-label">While you wait for more local prices to be added, try these instead:</p>
+      <a class="btn btn-primary" href="https://www.google.com/search?q=${searchQuery}" target="_blank" rel="noopener">🔎 Search Google for deals near you</a>
+      <a class="btn btn-secondary" href="https://flipp.com/" target="_blank" rel="noopener">🗞️ Browse local grocery flyers (Flipp)</a>
+      <p class="fallback-note">Know someone nearby who could scan a few price tags? Every scan on Stall Ledger makes this page more useful for everyone close by.</p>
+    </div>
+  `;
+}
+
+// ---- Location capture (just sets state now, doesn't trigger a search) ----
+
+useLocationBtn.addEventListener('click', () => {
+  if(!navigator.geolocation){
+    setStatus('Your browser doesn\'t support location — try typing your city or ZIP instead.', true);
+    return;
+  }
+  locationConfirm.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      currentUserLoc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      locationConfirm.textContent = '📍 Location set!';
+    },
+    err => {
+      console.warn('[Bargain Basket] Geolocation failed:', err);
+      locationConfirm.textContent = '';
+      setStatus('Could not get your location. Please try typing your city or ZIP code instead.', true);
+    }
+  );
+});
+
+setAddressBtn.addEventListener('click', async () => {
+  const address = addressInput.value.trim();
+  if(!address){
+    setStatus('Please enter a city or ZIP code first.', true);
+    return;
+  }
+  locationConfirm.textContent = 'Finding that location…';
+  const loc = await geocode(address);
+  if(!loc){
+    locationConfirm.textContent = '';
+    setStatus('Could not find that location. Please check the spelling and try again.', true);
+    return;
+  }
+  currentUserLoc = loc;
+  locationConfirm.textContent = `📍 Location set: ${escapeHtml(address)}`;
+});
+
+// ---- Grocery list photo extraction (Gemini vision, bring-your-own free key) ----
+
+getGeminiKeyBtn.addEventListener('click', () => {
+  window.open('https://aistudio.google.com/apikey', '_blank', 'noopener');
+});
+
+connectGeminiBtn.addEventListener('click', () => {
+  const key = geminiKeyInput.value.replace(/\s+/g, '');
+  if(!key){
+    photoStatus.textContent = 'Paste your code in the box first.';
+    photoStatus.className = 'photo-status err';
+    return;
+  }
+  geminiApiKey = key;
+  photoStatus.className = 'photo-status';
+  photoStatus.textContent = 'Connected! Now choose your photo again.';
+});
+
+listPhotoBtn.addEventListener('click', () => listPhotoInput.click());
+
+listPhotoInput.addEventListener('change', async () => {
+  const file = listPhotoInput.files[0];
+  if(!file) return;
+
+  if(!geminiApiKey){
+    aiConnect.classList.add('open');
+    photoStatus.className = 'photo-status err';
+    photoStatus.textContent = 'Connect Google AI below first, then choose your photo again.';
+    return;
+  }
+
+  photoStatus.className = 'photo-status';
+  photoStatus.textContent = 'Reading your list…';
+
+  try{
+    const dataUrl = await fileToDataUrl(file);
+    const base64 = dataUrl.split(',')[1];
+    const items = await extractListFromPhoto(base64, file.type || 'image/jpeg');
+    if(items.length === 0){
+      photoStatus.className = 'photo-status err';
+      photoStatus.textContent = 'Could not read any items from that photo — try a clearer shot, or type your list instead.';
+      return;
+    }
+    const existing = listTextarea.value.trim();
+    listTextarea.value = existing ? existing + '\n' + items.join('\n') : items.join('\n');
+    photoStatus.textContent = `Added ${items.length} item${items.length===1?'':'s'} from your photo.`;
+  }catch(err){
+    console.warn('[Bargain Basket] Photo list extraction failed:', err);
+    photoStatus.className = 'photo-status err';
+    photoStatus.textContent = 'Something went wrong reading that photo. Please try again, or type your list instead.';
+  }
+});
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function extractListFromPhoto(base64, mediaType){
+  const prompt =
+    'This image shows a handwritten or printed grocery/shopping list. ' +
+    'Extract each distinct grocery item mentioned. Respond with ONLY a raw JSON array ' +
+    'of plain strings, e.g. ["milk","eggs","bananas"]. No markdown fences, no explanation, ' +
+    'JSON only. If nothing is legible, return [].';
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mediaType, data: base64 } }
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || 'Gemini API error');
+  const text = data.candidates && data.candidates[0] && data.candidates[0].content &&
+               data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
+               data.candidates[0].content.parts[0].text;
+  if(!text) throw new Error('No response from Gemini');
+
+  let clean = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+  let parsed;
+  try{
+    parsed = JSON.parse(clean);
+  }catch(e){
+    const match = clean.match(/\[[\s\S]*\]/);
+    parsed = match ? JSON.parse(match[0]) : [];
+  }
+  return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+}
+
+// ---- Matching a grocery list against nearby prices ----
+
+function normalizeItemName(s){
+  return s.trim().toLowerCase();
+}
+
+function isMatch(listItem, produceName){
+  const a = normalizeItemName(listItem);
+  const b = normalizeItemName(produceName);
+  if(!a || !b) return false;
+  if(a === b) return true;
+  if(b.includes(a) || a.includes(b)) return true;
+  const aWords = a.split(/\s+/).filter(w => w.length >= 3);
+  const bWords = b.split(/\s+/).filter(w => w.length >= 3);
+  return aWords.some(w => bWords.includes(w));
+}
+
+function buildShoppingPlan(groceryList, withDistanceItems){
+  const perItemMatches = groceryList.map(listItem => {
+    const matches = withDistanceItems.filter(it => isMatch(listItem, it.produce));
+    matches.sort((a, b) => a._priceNum - b._priceNum);
+    return { listItem, matches };
+  });
+
+  const storeMap = {};
+  perItemMatches.forEach(({ listItem, matches }) => {
+    matches.forEach(m => {
+      const storeName = m.store || 'Unnamed store';
+      if(!storeMap[storeName]){
+        storeMap[storeName] = { store: storeName, distance: m._distance, items: {} };
+      }
+      const existing = storeMap[storeName].items[listItem];
+      if(!existing || m._priceNum < existing._priceNum){
+        storeMap[storeName].items[listItem] = m;
+      }
+    });
+  });
+
+  const storeCandidates = Object.values(storeMap).map(s => {
+    const coveredItems = Object.keys(s.items);
+    const totalPrice = coveredItems.reduce((sum, k) => sum + (s.items[k]._priceNum || 0), 0);
+    return Object.assign({}, s, { coveredCount: coveredItems.length, totalPrice });
+  });
+
+  storeCandidates.sort((a, b) => {
+    if(b.coveredCount !== a.coveredCount) return b.coveredCount - a.coveredCount;
+    return a.totalPrice - b.totalPrice;
+  });
+
+  return { perItemMatches, bestStore: storeCandidates[0] || null };
+}
+
+function renderTripPlan(groceryList, withDistanceItems){
+  resultsArea.innerHTML = '';
+  const { perItemMatches, bestStore } = buildShoppingPlan(groceryList, withDistanceItems);
+
+  if(!bestStore){
+    renderEmptyState(
+      'No matches found nearby',
+      `None of your list items were found within ${selectedMiles} miles. Try a wider distance, or check back as more prices get added.`
+    );
+    return;
+  }
+
+  const heading = document.createElement('p');
+  heading.className = 'results-heading';
+  heading.textContent = 'Your best single stop';
+  resultsArea.appendChild(heading);
+
+  const bestCovered = Object.keys(bestStore.items);
+  const bestCard = document.createElement('div');
+  bestCard.className = 'trip-summary-card';
+  bestCard.innerHTML = `
+    <div class="best-ribbon">BEST STOP</div>
+    <div class="trip-store-name">${escapeHtml(bestStore.store)}</div>
+    <div class="trip-store-distance">${bestStore.distance.toFixed(1)} miles away</div>
+    <div class="trip-coverage">Covers ${bestCovered.length} of ${groceryList.length} items on your list</div>
+    <div class="trip-total">Estimated total: $${bestStore.totalPrice.toFixed(2)}</div>
+  `;
+  const checklist = document.createElement('div');
+  checklist.className = 'checklist';
+  bestCovered.forEach(itemName => {
+    const m = bestStore.items[itemName];
+    const row = document.createElement('div');
+    row.className = 'checklist-item';
+    row.innerHTML = `<span>✅ ${escapeHtml(itemName)}</span><span>${escapeHtml(m.priceItem || m.priceWeight)}</span>`;
+    checklist.appendChild(row);
+  });
+  bestCard.appendChild(checklist);
+
+  const notCovered = groceryList.filter(li => !bestCovered.includes(li));
+  if(notCovered.length > 0){
+    const missingDiv = document.createElement('div');
+    missingDiv.className = 'checklist';
+    notCovered.forEach(li => {
+      const row = document.createElement('div');
+      row.className = 'checklist-item missing';
+      row.innerHTML = `<span>➕ ${escapeHtml(li)}</span><span>not found there</span>`;
+      missingDiv.appendChild(row);
+    });
+    bestCard.appendChild(missingDiv);
+  }
+  resultsArea.appendChild(bestCard);
+
+  // Alternative: cheapest overall, even if it means visiting more than one store
+  const altHeading = document.createElement('p');
+  altHeading.className = 'results-heading alt-heading';
+  altHeading.textContent = 'Or, save more by visiting multiple stores';
+  resultsArea.appendChild(altHeading);
+
+  const altCard = document.createElement('div');
+  altCard.className = 'trip-summary-card alt';
+  const altList = document.createElement('div');
+  altList.className = 'checklist';
+  let altTotal = 0;
+  let altFoundCount = 0;
+  perItemMatches.forEach(({ listItem, matches }) => {
+    const row = document.createElement('div');
+    row.className = 'checklist-item';
+    if(matches.length > 0){
+      const best = matches[0];
+      altTotal += best._priceNum || 0;
+      altFoundCount++;
+      row.innerHTML = `<span>✅ ${escapeHtml(listItem)} — ${escapeHtml(best.store || 'Unnamed store')} (${best._distance.toFixed(1)} mi)</span><span>${escapeHtml(best.priceItem || best.priceWeight)}</span>`;
+    } else {
+      row.className += ' missing';
+      row.innerHTML = `<span>➕ ${escapeHtml(listItem)}</span><span>not found nearby</span>`;
+    }
+    altList.appendChild(row);
+  });
+  altCard.innerHTML = `<div class="trip-coverage">Covers ${altFoundCount} of ${groceryList.length} items, across possibly several stores</div><div class="trip-total">Estimated total: $${altTotal.toFixed(2)}</div>`;
+  altCard.appendChild(altList);
+  resultsArea.appendChild(altCard);
+}
+
+// ---- Browse-all fallback (used when no grocery list is given) ----
+
+function renderBrowseAll(items){
+  resultsArea.innerHTML = '';
+
+  if(items.length === 0){
+    renderEmptyState(
+      'No bargains found that close',
+      'Try a wider distance, or check back later as more prices get added.'
+    );
+    return;
+  }
+
+  const heading = document.createElement('p');
+  heading.className = 'results-heading';
+  heading.textContent = `Bargains within ${selectedMiles} miles`;
+  resultsArea.appendChild(heading);
+
+  const groups = {};
+  items.forEach(item => {
+    const key = item.produce.trim().toLowerCase();
+    if(!groups[key]) groups[key] = { label: item.produce.trim(), entries: [] };
+    groups[key].entries.push(item);
+  });
+
+  Object.values(groups)
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .forEach(group => {
+      group.entries.sort((a, b) => a._priceNum - b._priceNum);
+
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'produce-group';
+      const nameEl = document.createElement('p');
+      nameEl.className = 'produce-name';
+      nameEl.textContent = group.label;
+      groupDiv.appendChild(nameEl);
+
+      group.entries.slice(0, 4).forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'price-card';
+        const priceLabel = item.priceItem || item.priceWeight;
+        const unitLabel = item.priceWeight && !item.priceItem ? '' : (item.priceWeight ? ` (${item.priceWeight})` : '');
+        card.innerHTML = `
+          <div class="price-card-main">
+            <div class="price-card-store">${escapeHtml(item.store || 'Unnamed store')}</div>
+            <div class="price-card-distance">${item._distance.toFixed(1)} miles away</div>
+          </div>
+          <div class="price-tag">${escapeHtml(priceLabel)}${unitLabel ? `<span class="unit">${escapeHtml(unitLabel)}</span>` : ''}</div>
+        `;
+        groupDiv.appendChild(card);
+      });
+      resultsArea.appendChild(groupDiv);
+    });
+}
+
+// ---- Shared: load + geocode nearby items within the selected radius ----
+
+async function loadNearbyItems(userLoc){
+  let allItems;
+  try{
+    const res = await fetch(COMPARE_URL);
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'Could not load price data');
+    allItems = data.items || [];
+  }catch(err){
+    console.warn('[Bargain Basket] Failed to load compare data:', err);
+    throw new Error('Could not load price data right now. Please try again in a moment.');
+  }
+
+  if(allItems.length === 0){
+    throw new Error('No prices have been added yet — check back soon.');
+  }
+
+  const withDistance = [];
+  let skippedCount = 0;
+
+  for(let i = 0; i < allItems.length; i++){
+    const item = allItems[i];
+    if(!item.area){ skippedCount++; continue; }
+    const areaLoc = await geocode(item.area);
+    if(!areaLoc){ skippedCount++; continue; }
+    const distance = haversineMiles(userLoc.lat, userLoc.lon, areaLoc.lat, areaLoc.lon);
+    if(distance <= selectedMiles){
+      const priceNum = priceToNumber(item.priceItem) ?? priceToNumber(item.priceWeight) ?? 999999;
+      withDistance.push(Object.assign({}, item, { _distance: distance, _priceNum: priceNum }));
+    }
+  }
+
+  return { withDistance, skippedCount };
+}
+
+// ---- Main action ----
+
+findTripBtn.addEventListener('click', async () => {
+  if(!currentUserLoc){
+    setStatus('Please set your location in Step 1 first.', true);
+    return;
+  }
+
+  setStatus('Looking up nearby prices — this can take a little while…');
+  resultsArea.innerHTML = '';
+
+  let withDistance, skippedCount;
+  try{
+    const result = await loadNearbyItems(currentUserLoc);
+    withDistance = result.withDistance;
+    skippedCount = result.skippedCount;
+  }catch(err){
+    setStatus(err.message, true);
+    return;
+  }
+
+  setStatus(
+    skippedCount > 0
+      ? `(${skippedCount} listing${skippedCount===1?'':'s'} couldn't be matched to a location and were left out.)`
+      : ''
+  );
+
+  const groceryList = listTextarea.value
+    .split(/[\n,]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if(groceryList.length === 0){
+    renderBrowseAll(withDistance);
+  } else {
+    renderTripPlan(groceryList, withDistance);
+  }
+});
+</script>
+</body>
+</html>
