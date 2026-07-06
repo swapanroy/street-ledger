@@ -118,41 +118,6 @@
     border-color:var(--marigold);
     background:rgba(255,255,255,0.14);
   }
-  .mode-toggle{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    flex-wrap:wrap;
-    margin-bottom:16px;
-    font-size:12.5px;
-    color:#C9D6C4;
-  }
-  .mode-pill{
-    font-family:'Public Sans', sans-serif;
-    font-size:12.5px;
-    font-weight:600;
-    padding:6px 14px 6px 10px;
-    border-radius:999px;
-    border:1.5px solid rgba(255,255,255,0.25);
-    background:transparent;
-    color:#C9D6C4;
-    cursor:pointer;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    transition:background .12s ease, color .12s ease, border-color .12s ease;
-  }
-  .mode-icon{
-    width:14px;
-    height:14px;
-    flex-shrink:0;
-  }
-  .mode-pill:hover{ border-color:rgba(255,255,255,0.5); }
-  .mode-pill.active{
-    background:var(--marigold);
-    border-color:var(--marigold);
-    color:var(--leaf);
-  }
   .capture-controls{
     display:flex;
     flex-wrap:wrap;
@@ -227,15 +192,6 @@
     font-size:12px;
     color:var(--sage);
   }
-  .db-status{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:11px;
-    padding:3px 9px;
-    border-radius:999px;
-  }
-  .db-status.connected{ background:#E3EEDD; color:var(--leaf); }
-  .db-status.offline{ background:var(--paper-dark); color:var(--sage); }
-  .db-status.error{ background:#F7E4E2; color:var(--radish-dark); }
   .bulk-bar{
     display:flex;
     gap:8px;
@@ -651,31 +607,10 @@
 
   <div class="capture-card">
     <p class="capture-head">Scan a price section</p>
-    <p class="capture-sub" id="captureSub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
+    <p class="capture-sub" id="captureSub">Take or upload a photo of the produce shelf tags — on-device text recognition and AI work together to read the names and prices for you.</p>
     <div class="capturer-row">
-      <label for="capturerNameInput">Your name</label>
-      <input type="text" id="capturerNameInput" placeholder="e.g. Swapan" autocomplete="name">
-    </div>
-    <div class="mode-toggle">
-      <span>Mode:</span>
-      <button class="mode-pill active" id="modeAiBtn" type="button">
-        <svg class="mode-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 2.5L11.4 7.1L16 8.5L11.4 9.9L10 14.5L8.6 9.9L4 8.5L8.6 7.1L10 2.5Z" fill="currentColor"/>
-          <path d="M15.5 12L16.1 14L18 14.6L16.1 15.2L15.5 17.2L14.9 15.2L13 14.6L14.9 14L15.5 12Z" fill="currentColor"/>
-        </svg>
-        AI extraction
-      </button>
-      <button class="mode-pill" id="modeOcrBtn" type="button">
-        <svg class="mode-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 6V3.5C3 3.22386 3.22386 3 3.5 3H6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M14 3H16.5C16.7761 3 17 3.22386 17 3.5V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M17 14V16.5C17 16.7761 16.7761 17 16.5 17H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M6 17H3.5C3.22386 17 3 16.7761 3 16.5V14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M6 8.5H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M6 11.5H11.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        Free OCR-only
-      </button>
+      <label for="capturerNameInput">Your name <span style="color:var(--marigold);">*</span></label>
+      <input type="text" id="capturerNameInput" placeholder="e.g. Jay" autocomplete="name" required>
     </div>
     <div class="capture-controls">
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
@@ -706,7 +641,6 @@
   <div class="ledger-head">
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <h2 class="ledger-title">Price ledger</h2>
-      <span class="db-status" id="dbStatus"></span>
     </div>
     <span class="ledger-count" id="rowCount">0 items</span>
   </div>
@@ -758,13 +692,12 @@
 // This endpoint is insert-only by design — see google-sheets-backend.gs for why.
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzQVORlZPhXr4v7gIJGJLZsm-bMdildCHHRS97WuowbC_P_Tw8HARcLAfxqYi53pCaD/exec';
 
-const dbStatus = document.getElementById('dbStatus');
 const sheetsConfigured = !GOOGLE_SCRIPT_URL.includes('YOUR-DEPLOYMENT-ID');
 
-function setDbStatus(state, text){
-  dbStatus.className = 'db-status ' + state;
-  dbStatus.textContent = text;
-}
+// Intentionally silent — saving status isn't shown to the person using the
+// app. Failures still get logged to the console for debugging (see the
+// insertItemsToDb/updateStoreInDb catch blocks), just not surfaced in the UI.
+function setDbStatus(state, text){}
 
 function describeError(err){
   if(!err) return 'Unknown error';
@@ -842,28 +775,6 @@ const dismissStoreBtn = document.getElementById('dismissStoreBtn');
 const setStoreSelectedBtn = document.getElementById('setStoreSelectedBtn');
 let storePromptMode = 'batch'; // 'batch' | 'selected'
 const settingsBtn = document.getElementById('settingsBtn');
-
-// Extraction mode: 'ai' (needs a key) or 'ocr' (free, no key, heuristic parsing only)
-let extractionMode = 'ai';
-const modeAiBtn = document.getElementById('modeAiBtn');
-const modeOcrBtn = document.getElementById('modeOcrBtn');
-const captureSub = document.getElementById('captureSub');
-
-const captureSubText = {
-  ai: 'Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.',
-  ocr: 'Take or upload a photo of the produce shelf tags — this free mode uses on-device text recognition only, no AI key needed. Works best with one or a few clear tags at a time.'
-};
-
-function setExtractionMode(mode){
-  extractionMode = mode;
-  modeAiBtn.classList.toggle('active', mode === 'ai');
-  modeOcrBtn.classList.toggle('active', mode === 'ocr');
-  captureSub.textContent = captureSubText[mode];
-  settingsBtn.style.display = mode === 'ocr' ? 'none' : '';
-}
-
-modeAiBtn.addEventListener('click', () => setExtractionMode('ai'));
-modeOcrBtn.addEventListener('click', () => setExtractionMode('ocr'));
 const settingsPanel = document.getElementById('settingsPanel');
 const providerSelect = document.getElementById('providerSelect');
 const apiKeyInput = document.getElementById('apiKeyInput');
@@ -1320,55 +1231,6 @@ function cleanOcrText(rawText){
   return deduped.join('\n');
 }
 
-// Free OCR-only mode: turns cleaned OCR text into produce/price rows using pattern matching,
-// no AI call at all. Works best when each tag's name and price are close together in the text.
-function parseOcrTextToItems(cleanText){
-  if(!cleanText) return [];
-
-  const weightRe = /\$?\s?(\d+(?:\.\d{1,2})?)\s*\/\s*(lb|lbs|kg|oz|g|each|ea)\b/i;
-  const itemRe = /\$\s?(\d+(?:\.\d{1,2})?)\b/;
-
-  const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
-  const items = [];
-  let pendingNameParts = [];
-
-  function flush(priceItem, priceWeight){
-    const name = pendingNameParts.join(' ').replace(/\s{2,}/g, ' ').trim();
-    pendingNameParts = [];
-    if(name && (priceItem || priceWeight)){
-      items.push({ store: '', produce: name, priceItem: priceItem || '', priceWeight: priceWeight || '' });
-    }
-  }
-
-  lines.forEach(line => {
-    const weightMatch = line.match(weightRe);
-    const itemMatch = !weightMatch ? line.match(itemRe) : null;
-
-    if(weightMatch || itemMatch){
-      let remainder = line;
-      let priceItem = '', priceWeight = '';
-      if(weightMatch){
-        priceWeight = `$${weightMatch[1]}/${weightMatch[2].toLowerCase()}`;
-        remainder = remainder.replace(weightMatch[0], '');
-      } else if(itemMatch){
-        priceItem = `$${itemMatch[1]}`;
-        remainder = remainder.replace(itemMatch[0], '');
-      }
-      remainder = remainder.replace(/[-–—:|_]+/g, ' ').trim();
-      if(remainder.replace(/[^a-zA-Z]/g, '').length >= 2){
-        // Name and price appeared on the same line
-        pendingNameParts.push(remainder);
-      }
-      flush(priceItem, priceWeight);
-    } else if(line.replace(/[^a-zA-Z]/g, '').length >= 2){
-      // No price here — treat as (part of) the name for whichever price comes next
-      pendingNameParts.push(line);
-    }
-  });
-
-  return items;
-}
-
 // --- Photo optimization, applied to a copy used only for extraction (AI + OCR) ---
 // The original photo is still what's stored/shown in the ledger; this optimized
 // version just gives both extraction paths a cleaner image to read from.
@@ -1463,7 +1325,14 @@ function optimizePhotoForExtraction(dataUrl){
 extractBtn.addEventListener('click', async () => {
   if(!selectedFile) return;
 
-  if(extractionMode === 'ai' && !llmConfig.apiKey){
+  if(!capturerNameInput.value.trim()){
+    statusMsg.textContent = 'Please enter your name above before scanning.';
+    statusMsg.classList.add('err');
+    capturerNameInput.focus();
+    return;
+  }
+
+  if(!llmConfig.apiKey){
     statusMsg.textContent = 'First, connect an AI up top — it only takes a minute.';
     statusMsg.classList.add('err');
     settingsPanel.classList.add('open');
@@ -1496,54 +1365,43 @@ extractBtn.addEventListener('click', async () => {
     const ocrCleanText = cleanOcrText(ocrRawText);
     console.log('[Stall Ledger] OCR cleaned text:', ocrCleanText);
 
-    let parsed = null;
-    let usage = null;
-
-    if(extractionMode === 'ocr'){
-      // Free mode: skip the AI entirely, parse the cleaned OCR text with pattern matching
-      statusMsg.textContent = 'Step 3/3: Matching names to prices…';
-      parsed = parseOcrTextToItems(ocrCleanText);
-      console.log('[Stall Ledger] OCR-only parsed items:', parsed);
+    // Step 3: send the optimized prompt (image + cleaned OCR hints) to the AI
+    statusMsg.textContent = 'Step 3/3: Reading shelf tags with AI…';
+    const promptText = buildExtractionPrompt(ocrCleanText);
+    console.log('[Stall Ledger] Final prompt sent to AI:\n' + promptText);
+    const aiResult = await extractWithConfiguredProvider(optimizedFull, base64, mediaType, promptText);
+    const rawText = aiResult.text;
+    const usage = aiResult.usage;
+    console.log('[Stall Ledger] Raw AI response:', rawText);
+    if(usage){
+      console.log(`[Stall Ledger] Token usage — input: ${usage.inputTokens}, output: ${usage.outputTokens}, total: ${usage.inputTokens + usage.outputTokens}`);
     } else {
-      // Step 3: send the optimized prompt (image + cleaned OCR hints) to the AI
-      statusMsg.textContent = 'Step 3/3: Reading shelf tags with AI…';
-      const promptText = buildExtractionPrompt(ocrCleanText);
-      console.log('[Stall Ledger] Final prompt sent to AI:\n' + promptText);
-      const aiResult = await extractWithConfiguredProvider(optimizedFull, base64, mediaType, promptText);
-      const rawText = aiResult.text;
-      usage = aiResult.usage;
-      console.log('[Stall Ledger] Raw AI response:', rawText);
-      if(usage){
-        console.log(`[Stall Ledger] Token usage — input: ${usage.inputTokens}, output: ${usage.outputTokens}, total: ${usage.inputTokens + usage.outputTokens}`);
-      } else {
-        console.log('[Stall Ledger] Token usage: not reported by this provider.');
-      }
+      console.log('[Stall Ledger] Token usage: not reported by this provider.');
+    }
 
-      let clean = rawText.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-      try{
-        parsed = JSON.parse(clean);
-      }catch(e){
-        // Fallback: the model may have added stray text around the JSON — pull out the array substring.
-        const match = clean.match(/\[[\s\S]*\]/);
-        if(match){
-          try{ parsed = JSON.parse(match[0]); }catch(e2){ parsed = null; }
-        }
+    let clean = rawText.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+    let parsed = null;
+    try{
+      parsed = JSON.parse(clean);
+    }catch(e){
+      // Fallback: the model may have added stray text around the JSON — pull out the array substring.
+      const match = clean.match(/\[[\s\S]*\]/);
+      if(match){
+        try{ parsed = JSON.parse(match[0]); }catch(e2){ parsed = null; }
       }
-      // Fallback: the model may have wrapped the array in an object, e.g. { "items": [...] }.
-      if(parsed && !Array.isArray(parsed)){
-        const arrayField = Object.values(parsed).find(v => Array.isArray(v));
-        parsed = arrayField || null;
-      }
-      if(!parsed){
-        console.warn('[Stall Ledger] Could not parse AI response as JSON:', rawText);
-        throw new Error('Could not parse the response — try again or switch providers');
-      }
+    }
+    // Fallback: the model may have wrapped the array in an object, e.g. { "items": [...] }.
+    if(parsed && !Array.isArray(parsed)){
+      const arrayField = Object.values(parsed).find(v => Array.isArray(v));
+      parsed = arrayField || null;
+    }
+    if(!parsed){
+      console.warn('[Stall Ledger] Could not parse AI response as JSON:', rawText);
+      throw new Error('Could not parse the response — try again or switch providers');
     }
 
     if(!Array.isArray(parsed) || parsed.length === 0){
-      statusMsg.textContent = extractionMode === 'ocr'
-        ? 'No clear name+price pairs found — try a closer, straighter shot of one or two tags.'
-        : 'No readable prices found in that photo — try a clearer shot.';
+      statusMsg.textContent = 'No readable prices found in that photo — try a clearer shot.';
       statusMsg.classList.add('err');
     } else {
       const entered = todayStr();
