@@ -743,7 +743,7 @@ async function loadClientNetInfo(){
     const res = await fetch('https://ipapi.co/json/');
     const data = await res.json();
     clientNetInfo.ip = data.ip || '';
-    clientNetInfo.area = [data.city, data.region, data.country_name].filter(Boolean).join(', ');
+    clientNetInfo.area = [data.city, data.region_code || data.region].filter(Boolean).join(', ');
   }catch(err){
     console.warn('[Stall Ledger] Could not detect IP/location:', err);
   }
@@ -1592,31 +1592,48 @@ exportXlsxBtn.addEventListener('click', () => {
 
 async function insertItemsToDb(newItems){
   if(!sheetsConfigured) return;
-  try{
-    const payload = {
-      action: 'insert',
-      items: newItems.map(i => ({
-        store: i.store,
-        produce: i.produce,
-        priceItem: i.priceItem,
-        priceWeight: i.priceWeight,
-        dateEntered: i.dateEntered,
-        dateEnteredISO: i.dateEnteredISO,
-        capturedBy: i.capturedBy,
-        os: i.os,
-        ipAddress: i.ipAddress,
-        area: i.area
-      }))
-    };
-    // GET with the payload in the URL — Apps Script Web Apps have a known quirk
-    // where POST responses can get blocked by the browser's CORS check even
-    // when deployed correctly. GET avoids that reliably.
-    const url = GOOGLE_SCRIPT_URL + '?action=insert&payload=' + encodeURIComponent(JSON.stringify(payload));
-    const response = await fetch(url);
-    const data = await response.json();
-    if(!data.ok) throw new Error(data.error || 'Unknown error from Sheets backend');
 
-    (data.ids || []).forEach((id, idx) => { if(newItems[idx]) newItems[idx].dbId = id; });
+  const mapItem = i => ({
+    store: i.store,
+    produce: i.produce,
+    priceItem: i.priceItem,
+    priceWeight: i.priceWeight,
+    dateEntered: i.dateEntered,
+    dateEnteredISO: i.dateEnteredISO,
+    capturedBy: i.capturedBy,
+    os: i.os,
+    ipAddress: i.ipAddress,
+    area: i.area
+  });
+
+  // Split large scans into chunks small enough that the resulting GET URL stays
+  // well under common URL-length limits. A very long URL (e.g. many items with
+  // long produce names in one scan) can fail silently with what looks like a
+  // CORS error, but is really the request getting rejected for being too long.
+  const MAX_PAYLOAD_CHARS = 1400;
+  const chunks = [];
+  let current = [];
+  newItems.forEach(item => {
+    const candidate = current.concat([item]);
+    const encodedLen = encodeURIComponent(JSON.stringify({ action: 'insert', items: candidate.map(mapItem) })).length;
+    if(encodedLen > MAX_PAYLOAD_CHARS && current.length > 0){
+      chunks.push(current);
+      current = [item];
+    } else {
+      current = candidate;
+    }
+  });
+  if(current.length) chunks.push(current);
+
+  try{
+    for(const chunk of chunks){
+      const payload = { action: 'insert', items: chunk.map(mapItem) };
+      const url = GOOGLE_SCRIPT_URL + '?action=insert&payload=' + encodeURIComponent(JSON.stringify(payload));
+      const response = await fetch(url);
+      const data = await response.json();
+      if(!data.ok) throw new Error(data.error || 'Unknown error from Sheets backend');
+      (data.ids || []).forEach((id, idx) => { if(chunk[idx]) chunk[idx].dbId = id; });
+    }
     setDbStatus('offline', '🔒 Scans are saved — view them in the Google Sheet');
   }catch(err){
     console.warn('[Stall Ledger] Could not save new items to Google Sheet:', describeError(err), err);
