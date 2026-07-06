@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --paper:#FAF6EC;
@@ -722,22 +721,13 @@
 </div>
 
 <script>
-// ---- Shared database config (Supabase) ----
-// Paste your project's URL and anon public key here (Project Settings → API in Supabase).
-// The anon key is designed to be public — safety comes from the Row Level Security
-// policies set up via supabase-setup.sql, not from hiding this key.
-const SUPABASE_URL = 'https://ubotbncrhoeleowiliis.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib3RibmNyaG9lbGVvd2lsaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTEwMTAsImV4cCI6MjA5ODg2NzAxMH0.gQg9-T2LHV25SZTpX7EmL4AGE_1R0KfteWW4KijgwBY';
+// ---- Shared database config (Google Sheets, via Apps Script) ----
+// Paste the Web App URL from your Apps Script deployment here (ends in /exec).
+// This endpoint is insert-only by design — see google-sheets-backend.gs for why.
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwa_Qf4H09Jl1IfH5TsTzpZOXl0Y1gtM3t2upO0BjCxaFZWgvazx8F-kkFhNiTdP-dM/exec';
 
 const dbStatus = document.getElementById('dbStatus');
-let supabaseClient = null;
-if(!SUPABASE_URL.includes('YOUR-PROJECT') && typeof window.supabase !== 'undefined'){
-  try{
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }catch(err){
-    console.warn('[Stall Ledger] Could not initialize Supabase client:', err);
-  }
-}
+const sheetsConfigured = !GOOGLE_SCRIPT_URL.includes('YOUR-DEPLOYMENT-ID');
 
 function setDbStatus(state, text){
   dbStatus.className = 'db-status ' + state;
@@ -753,8 +743,10 @@ function describeError(err){
   try{ return JSON.stringify(err); }catch(e){ return String(err); }
 }
 
-if(!supabaseClient){
-  setDbStatus('offline', '⚪ Local only — shared database not configured');
+if(sheetsConfigured){
+  setDbStatus('offline', '🔒 Scans are saved — view them in the Google Sheet');
+} else {
+  setDbStatus('offline', '⚪ Local only — shared sheet not configured');
 }
 
 let items = [];   // {id, dbId, dateEntered, store, produce, priceItem, priceWeight, photoUrl, batchId}
@@ -1664,98 +1656,55 @@ exportXlsxBtn.addEventListener('click', () => {
   XLSX.writeFile(wb, `stall-ledger-${todayFileStamp()}.xlsx`);
 });
 
-// ---- Shared database helpers (Supabase) ----
+// ---- Shared database helpers (Google Sheets) ----
 // All of these fail gracefully — if the DB isn't configured or a request fails,
 // the app keeps working locally; the shared save/sync is best-effort.
 
-async function loadSharedLedger(){
-  if(!supabaseClient) return;
-  setDbStatus('offline', '⚪ Connecting…');
-  try{
-    const { data, error } = await supabaseClient
-      .from('ledger_items')
-      .select('*')
-      .order('created_at', { ascending: true });
-    if(error) throw error;
-
-    items = (data || []).map(row => ({
-      id: idCounter++,
-      dbId: row.id,
-      dateEntered: row.date_entered,
-      dateEnteredISO: row.date_entered_iso,
-      store: row.store || '',
-      produce: row.produce || '',
-      priceItem: row.price_item || '',
-      priceWeight: row.price_weight || '',
-      photoUrl: null,
-      photoFullUrl: null,
-      batchId: null,
-      selected: false
-    }));
-    renderTable();
-    setDbStatus('connected', `☁ Shared ledger connected — ${items.length} item${items.length===1?'':'s'} loaded`);
-  }catch(err){
-    console.warn('[Stall Ledger] Could not load shared ledger:', describeError(err), err);
-    const isPermissionDenied = err && (err.code === '42501' || /permission denied|row-level security/i.test(describeError(err)));
-    if(isPermissionDenied){
-      setDbStatus('offline', '🔒 Scans are saved — full ledger is admin-only');
-    } else {
-      setDbStatus('error', '⚠ Could not reach shared database — working locally');
-    }
-  }
-}
+// ---- Shared database: Google Sheets, via Apps Script Web App ----
+// This is insert-only by design (see google-sheets-backend.gs for why: there's
+// no secure way for public HTML to prove "I'm the admin" without a real login
+// system). So there's no loadSharedLedger() — the shared history is only ever
+// visible by opening the Google Sheet directly. Each visitor's own scans still
+// show up in their own session locally, same as before.
 
 async function insertItemsToDb(newItems){
-  if(!supabaseClient) return;
+  if(!sheetsConfigured) return;
   try{
-    const rows = newItems.map(i => ({
-      store: i.store,
-      produce: i.produce,
-      price_item: i.priceItem,
-      price_weight: i.priceWeight,
-      date_entered: i.dateEntered,
-      date_entered_iso: i.dateEnteredISO
-    }));
-    const { data, error } = await supabaseClient.from('ledger_items').insert(rows).select();
-    if(error) throw error;
-    // Attach the generated DB ids back onto the local items so later edits/deletes can target them.
-    (data || []).forEach((row, idx) => { if(newItems[idx]) newItems[idx].dbId = row.id; });
-    setDbStatus('connected', '☁ Saved to shared ledger');
+    const payload = {
+      action: 'insert',
+      items: newItems.map(i => ({
+        store: i.store,
+        produce: i.produce,
+        priceItem: i.priceItem,
+        priceWeight: i.priceWeight,
+        dateEntered: i.dateEntered,
+        dateEnteredISO: i.dateEnteredISO
+      }))
+    };
+    // Content-Type text/plain avoids a CORS preflight request, which Apps
+    // Script doesn't handle well — it still parses the body as JSON on its end.
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if(!data.ok) throw new Error(data.error || 'Unknown error from Sheets backend');
+
+    (data.ids || []).forEach((id, idx) => { if(newItems[idx]) newItems[idx].dbId = id; });
+    setDbStatus('offline', '🔒 Scans are saved — view them in the Google Sheet');
   }catch(err){
-    console.warn('[Stall Ledger] Could not save new items to shared ledger:', describeError(err), err);
-    setDbStatus('error', '⚠ Saved locally only — could not reach shared database');
+    console.warn('[Stall Ledger] Could not save new items to Google Sheet:', describeError(err), err);
+    setDbStatus('error', '⚠ Saved locally only — could not reach the shared sheet');
   }
 }
 
-async function updateStoreInDb(dbId, store){
-  if(!supabaseClient || !dbId) return;
-  try{
-    const { error } = await supabaseClient.from('ledger_items').update({ store }).eq('id', dbId);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[Stall Ledger] Could not update store name in shared ledger:', describeError(err), err);
-  }
-}
-
-async function deleteItemsFromDb(dbIds){
-  if(!supabaseClient || !dbIds.length) return;
-  try{
-    const { error } = await supabaseClient.from('ledger_items').delete().in('id', dbIds);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[Stall Ledger] Could not delete items from shared ledger:', describeError(err), err);
-  }
-}
-
-async function deleteAllFromDb(){
-  if(!supabaseClient) return;
-  try{
-    const { error } = await supabaseClient.from('ledger_items').delete().gte('id', 0);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[Stall Ledger] Could not clear shared ledger:', describeError(err), err);
-  }
-}
+// These are intentionally no-ops: editing/deleting shared rows only happens
+// by opening the Google Sheet directly (see the note above). The app's local
+// session view still updates instantly for the person using it either way.
+async function updateStoreInDb(dbId, store){ return; }
+async function deleteItemsFromDb(dbIds){ return; }
+async function deleteAllFromDb(){ return; }
 
 function renderTable(){
   ledgerBody.innerHTML = '';
@@ -1910,12 +1859,6 @@ removeSelectedBtn.addEventListener('click', () => {
 });
 
 removeAllBtn.addEventListener('click', () => {
-  if(supabaseClient){
-    const confirmed = window.confirm(
-      'This will permanently delete the SHARED ledger for everyone using this site, not just your own view. This cannot be undone. Continue?'
-    );
-    if(!confirmed) return;
-  }
   items = [];
   selectAll.checked = false;
   storePrompt.classList.remove('open');
@@ -1937,7 +1880,6 @@ function updateBulkControls(){
 
 renderTable();
 settingsPanel.classList.add('open');
-loadSharedLedger();
 </script>
 </body>
 </html>
