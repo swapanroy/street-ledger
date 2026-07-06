@@ -744,11 +744,21 @@ async function loadClientNetInfo(){
     const data = await res.json();
     clientNetInfo.ip = data.ip || '';
     clientNetInfo.area = [data.city, data.region_code || data.region].filter(Boolean).join(', ');
+    console.log('[Stall Ledger] IP/location detected:', clientNetInfo.ip, clientNetInfo.area);
   }catch(err){
-    console.warn('[Stall Ledger] Could not detect IP/location:', err);
+    console.warn('[Stall Ledger] Could not detect IP/location (will retry before next scan):', err);
   }
 }
 loadClientNetInfo();
+
+// Re-attempt just before each scan if the initial lookup never succeeded —
+// so one early failure (blocked request, slow network) doesn't leave every
+// scan in the session with a permanently blank ip_address/area.
+async function ensureClientNetInfo(){
+  if(!clientNetInfo.ip){
+    await loadClientNetInfo();
+  }
+}
 
 const cameraInput = document.getElementById('cameraInput');
 const libraryInput = document.getElementById('libraryInput');
@@ -1404,6 +1414,7 @@ extractBtn.addEventListener('click', async () => {
       statusMsg.textContent = 'No readable prices found in that photo — try a clearer shot.';
       statusMsg.classList.add('err');
     } else {
+      await ensureClientNetInfo();
       const entered = todayStr();
       const enteredISO = new Date().toISOString().slice(0, 10);
       const batchId = batchCounter++;
