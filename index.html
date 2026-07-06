@@ -90,6 +90,34 @@
     color:#C9D6C4;
     margin:0 0 18px;
   }
+  .capturer-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .capturer-row label{
+    font-size:12.5px;
+    color:#C9D6C4;
+    font-weight:600;
+  }
+  .capturer-row input[type=text]{
+    font-family:'Public Sans', sans-serif;
+    font-size:13px;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1.5px solid rgba(255,255,255,0.3);
+    background:rgba(255,255,255,0.08);
+    color:#fff;
+    min-width:160px;
+  }
+  .capturer-row input[type=text]::placeholder{ color:rgba(255,255,255,0.45); }
+  .capturer-row input[type=text]:focus{
+    outline:none;
+    border-color:var(--marigold);
+    background:rgba(255,255,255,0.14);
+  }
   .mode-toggle{
     display:flex;
     align-items:center;
@@ -624,6 +652,10 @@
   <div class="capture-card">
     <p class="capture-head">Scan a price section</p>
     <p class="capture-sub" id="captureSub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
+    <div class="capturer-row">
+      <label for="capturerNameInput">Your name</label>
+      <input type="text" id="capturerNameInput" placeholder="e.g. Swapan" autocomplete="name">
+    </div>
     <div class="mode-toggle">
       <span>Mode:</span>
       <button class="mode-pill active" id="modeAiBtn" type="button">
@@ -755,6 +787,35 @@ let selectedFileDataUrl = null;
 let idCounter = 1;
 let batchCounter = 1;
 let lastBatchId = null;
+
+const capturerNameInput = document.getElementById('capturerNameInput');
+
+// OS is detected purely client-side, no network call needed.
+function detectOS(){
+  const ua = navigator.userAgent || '';
+  if(/Windows/i.test(ua)) return 'Windows';
+  if(/Mac OS X|Macintosh/i.test(ua)) return 'macOS';
+  if(/Android/i.test(ua)) return 'Android';
+  if(/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
+  if(/CrOS/i.test(ua)) return 'ChromeOS';
+  if(/Linux/i.test(ua)) return 'Linux';
+  return 'Unknown';
+}
+
+// IP address + rough geographic area come from a single free lookup service,
+// called once per page load and cached for the rest of the session.
+let clientNetInfo = { ip: '', area: '' };
+async function loadClientNetInfo(){
+  try{
+    const res = await fetch('https://ipapi.co/json/');
+    const data = await res.json();
+    clientNetInfo.ip = data.ip || '';
+    clientNetInfo.area = [data.city, data.region, data.country_name].filter(Boolean).join(', ');
+  }catch(err){
+    console.warn('[Stall Ledger] Could not detect IP/location:', err);
+  }
+}
+loadClientNetInfo();
 
 const cameraInput = document.getElementById('cameraInput');
 const libraryInput = document.getElementById('libraryInput');
@@ -1506,6 +1567,10 @@ extractBtn.addEventListener('click', async () => {
           photoUrl: normalized.thumb,
           photoFullUrl: normalized.full,
           batchId: batchId,
+          capturedBy: capturerNameInput.value.trim(),
+          os: detectOS(),
+          ipAddress: clientNetInfo.ip,
+          area: clientNetInfo.area,
           selected: false
         };
         items.push(newItem);
@@ -1678,16 +1743,18 @@ async function insertItemsToDb(newItems){
         priceItem: i.priceItem,
         priceWeight: i.priceWeight,
         dateEntered: i.dateEntered,
-        dateEnteredISO: i.dateEnteredISO
+        dateEnteredISO: i.dateEnteredISO,
+        capturedBy: i.capturedBy,
+        os: i.os,
+        ipAddress: i.ipAddress,
+        area: i.area
       }))
     };
-    // Content-Type text/plain avoids a CORS preflight request, which Apps
-    // Script doesn't handle well — it still parses the body as JSON on its end.
-    const response = await fetch(GOOGLE_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
+    // GET with the payload in the URL — Apps Script Web Apps have a known quirk
+    // where POST responses can get blocked by the browser's CORS check even
+    // when deployed correctly. GET avoids that reliably.
+    const url = GOOGLE_SCRIPT_URL + '?action=insert&payload=' + encodeURIComponent(JSON.stringify(payload));
+    const response = await fetch(url);
     const data = await response.json();
     if(!data.ok) throw new Error(data.error || 'Unknown error from Sheets backend');
 
@@ -1702,7 +1769,21 @@ async function insertItemsToDb(newItems){
 // These are intentionally no-ops: editing/deleting shared rows only happens
 // by opening the Google Sheet directly (see the note above). The app's local
 // session view still updates instantly for the person using it either way.
-async function updateStoreInDb(dbId, store){ return; }
+async function updateStoreInDb(dbId, store){
+  if(!sheetsConfigured || !dbId) return;
+  try{
+    const url = GOOGLE_SCRIPT_URL + '?action=update&id=' + encodeURIComponent(dbId) + '&store=' + encodeURIComponent(store || '');
+    const response = await fetch(url);
+    const data = await response.json();
+    if(!data.ok) throw new Error(data.error || 'Unknown error from Sheets backend');
+  }catch(err){
+    console.warn('[Stall Ledger] Could not update store name in Google Sheet:', describeError(err), err);
+  }
+}
+
+// Deleting still isn't exposed here — a row's id only lets you fix its own
+// store name (see google-sheets-backend.gs), not remove it. Delete rows
+// directly in the Google Sheet if needed.
 async function deleteItemsFromDb(dbIds){ return; }
 async function deleteAllFromDb(){ return; }
 
