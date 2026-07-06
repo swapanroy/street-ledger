@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --paper:#FAF6EC;
@@ -90,6 +91,41 @@
     color:#C9D6C4;
     margin:0 0 18px;
   }
+  .mode-toggle{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+    font-size:12.5px;
+    color:#C9D6C4;
+  }
+  .mode-pill{
+    font-family:'Public Sans', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:6px 14px 6px 10px;
+    border-radius:999px;
+    border:1.5px solid rgba(255,255,255,0.25);
+    background:transparent;
+    color:#C9D6C4;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    transition:background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .mode-icon{
+    width:14px;
+    height:14px;
+    flex-shrink:0;
+  }
+  .mode-pill:hover{ border-color:rgba(255,255,255,0.5); }
+  .mode-pill.active{
+    background:var(--marigold);
+    border-color:var(--marigold);
+    color:var(--leaf);
+  }
   .capture-controls{
     display:flex;
     flex-wrap:wrap;
@@ -164,6 +200,15 @@
     font-size:12px;
     color:var(--sage);
   }
+  .db-status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:999px;
+  }
+  .db-status.connected{ background:#E3EEDD; color:var(--leaf); }
+  .db-status.offline{ background:var(--paper-dark); color:var(--sage); }
+  .db-status.error{ background:#F7E4E2; color:var(--radish-dark); }
   .bulk-bar{
     display:flex;
     gap:8px;
@@ -579,7 +624,28 @@
 
   <div class="capture-card">
     <p class="capture-head">Scan a price section</p>
-    <p class="capture-sub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
+    <p class="capture-sub" id="captureSub">Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.</p>
+    <div class="mode-toggle">
+      <span>Mode:</span>
+      <button class="mode-pill active" id="modeAiBtn" type="button">
+        <svg class="mode-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 2.5L11.4 7.1L16 8.5L11.4 9.9L10 14.5L8.6 9.9L4 8.5L8.6 7.1L10 2.5Z" fill="currentColor"/>
+          <path d="M15.5 12L16.1 14L18 14.6L16.1 15.2L15.5 17.2L14.9 15.2L13 14.6L14.9 14L15.5 12Z" fill="currentColor"/>
+        </svg>
+        AI extraction
+      </button>
+      <button class="mode-pill" id="modeOcrBtn" type="button">
+        <svg class="mode-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 6V3.5C3 3.22386 3.22386 3 3.5 3H6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M14 3H16.5C16.7761 3 17 3.22386 17 3.5V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M17 14V16.5C17 16.7761 16.7761 17 16.5 17H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M6 17H3.5C3.22386 17 3 16.7761 3 16.5V14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M6 8.5H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M6 11.5H11.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Free OCR-only
+      </button>
+    </div>
     <div class="capture-controls">
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
       <input type="file" id="libraryInput" accept="image/*" style="display:none;">
@@ -607,7 +673,10 @@
   </div>
 
   <div class="ledger-head">
-    <h2 class="ledger-title">Price ledger</h2>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h2 class="ledger-title">Price ledger</h2>
+      <span class="db-status" id="dbStatus"></span>
+    </div>
     <span class="ledger-count" id="rowCount">0 items</span>
   </div>
 
@@ -653,7 +722,33 @@
 </div>
 
 <script>
-let items = [];   // {id, dateEntered, store, produce, priceItem, priceWeight, photoUrl, batchId}
+// ---- Shared database config (Supabase) ----
+// Paste your project's URL and anon public key here (Project Settings → API in Supabase).
+// The anon key is designed to be public — safety comes from the Row Level Security
+// policies set up via supabase-setup.sql, not from hiding this key.
+const SUPABASE_URL = 'https://ubotbncrhoeleowiliis.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib3RibmNyaG9lbGVvd2lsaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTEwMTAsImV4cCI6MjA5ODg2NzAxMH0.gQg9-T2LHV25SZTpX7EmL4AGE_1R0KfteWW4KijgwBY';
+
+const dbStatus = document.getElementById('dbStatus');
+let supabaseClient = null;
+if(!SUPABASE_URL.includes('YOUR-PROJECT') && typeof window.supabase !== 'undefined'){
+  try{
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }catch(err){
+    console.warn('[Stall Ledger] Could not initialize Supabase client:', err);
+  }
+}
+
+function setDbStatus(state, text){
+  dbStatus.className = 'db-status ' + state;
+  dbStatus.textContent = text;
+}
+
+if(!supabaseClient){
+  setDbStatus('offline', '⚪ Local only — shared database not configured');
+}
+
+let items = [];   // {id, dbId, dateEntered, store, produce, priceItem, priceWeight, photoUrl, batchId}
 let selectedFile = null;
 let selectedFileDataUrl = null;
 let idCounter = 1;
@@ -685,6 +780,28 @@ const dismissStoreBtn = document.getElementById('dismissStoreBtn');
 const setStoreSelectedBtn = document.getElementById('setStoreSelectedBtn');
 let storePromptMode = 'batch'; // 'batch' | 'selected'
 const settingsBtn = document.getElementById('settingsBtn');
+
+// Extraction mode: 'ai' (needs a key) or 'ocr' (free, no key, heuristic parsing only)
+let extractionMode = 'ai';
+const modeAiBtn = document.getElementById('modeAiBtn');
+const modeOcrBtn = document.getElementById('modeOcrBtn');
+const captureSub = document.getElementById('captureSub');
+
+const captureSubText = {
+  ai: 'Take or upload a photo of the produce shelf tags — your chosen AI reads the names and prices for you.',
+  ocr: 'Take or upload a photo of the produce shelf tags — this free mode uses on-device text recognition only, no AI key needed. Works best with one or a few clear tags at a time.'
+};
+
+function setExtractionMode(mode){
+  extractionMode = mode;
+  modeAiBtn.classList.toggle('active', mode === 'ai');
+  modeOcrBtn.classList.toggle('active', mode === 'ocr');
+  captureSub.textContent = captureSubText[mode];
+  settingsBtn.style.display = mode === 'ocr' ? 'none' : '';
+}
+
+modeAiBtn.addEventListener('click', () => setExtractionMode('ai'));
+modeOcrBtn.addEventListener('click', () => setExtractionMode('ocr'));
 const settingsPanel = document.getElementById('settingsPanel');
 const providerSelect = document.getElementById('providerSelect');
 const apiKeyInput = document.getElementById('apiKeyInput');
@@ -982,16 +1099,129 @@ async function extractWithConfiguredProvider(dataUrl, base64, mediaType, promptT
   return await callAnthropic(llmConfig.apiKey, base64, mediaType, promptText);
 }
 
+// Preprocess for OCR: convert to grayscale, stretch contrast to the full range, and
+// upscale small images — all things Tesseract reads noticeably better than a raw color photo.
+function preprocessForOcr(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const minLongEdge = 1400;
+      let { width, height } = img;
+      const longEdge = Math.max(width, height);
+      const scale = longEdge < minLongEdge ? (minLongEdge / longEdge) : 1;
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const d = imageData.data;
+
+      let min = 255, max = 0;
+      const gray = new Uint8ClampedArray(d.length / 4);
+      for(let i = 0, j = 0; i < d.length; i += 4, j++){
+        const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        gray[j] = g;
+        if(g < min) min = g;
+        if(g > max) max = g;
+      }
+      const range = Math.max(1, max - min);
+      for(let i = 0, j = 0; i < d.length; i += 4, j++){
+        const stretched = ((gray[j] - min) / range) * 255;
+        d[i] = d[i + 1] = d[i + 2] = stretched;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => reject(new Error('Could not preprocess image for OCR'));
+    img.src = dataUrl;
+  });
+}
+
+// Produces a color-inverted copy — turns light-on-dark tags (e.g. white text on a red
+// sale sign) into dark-on-light, which OCR engines are much better at reading.
+function invertImageDataUrl(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      for(let i = 0; i < d.length; i += 4){
+        d[i] = 255 - d[i];
+        d[i + 1] = 255 - d[i + 1];
+        d[i + 2] = 255 - d[i + 2];
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => reject(new Error('Could not invert image for OCR'));
+    img.src = dataUrl;
+  });
+}
+
+// Reuse a single Tesseract worker across passes/scans instead of spinning one up each
+// time — avoids re-loading the language data on every photo (faster, less memory churn).
+let ocrWorkerPromise = null;
+function getOcrWorker(){
+  if(!ocrWorkerPromise){
+    ocrWorkerPromise = Tesseract.createWorker('eng').then(async worker => {
+      // Sparse text mode: better suited to scattered price tags than a block of prose.
+      await worker.setParameters({ tessedit_pageseg_mode: '11' });
+      return worker;
+    });
+  }
+  return ocrWorkerPromise;
+}
+
+// Keep only words Tesseract itself is reasonably confident about, dropping low-confidence
+// noise (glare, texture, decorative fonts) that would otherwise pollute the cleaned text.
+function extractConfidentText(data, minConfidence){
+  if(!data) return '';
+  if(!Array.isArray(data.lines) || data.lines.length === 0){
+    return data.text || '';
+  }
+  return data.lines
+    .map(line => {
+      if(!Array.isArray(line.words) || line.words.length === 0) return (line.text || '').trim();
+      const kept = line.words.filter(w => (w.confidence || 0) >= minConfidence).map(w => w.text);
+      return kept.join(' ');
+    })
+    .filter(l => l.trim().length > 0)
+    .join('\n');
+}
+
+async function runOcrPass(worker, dataUrl){
+  const { data } = await worker.recognize(dataUrl);
+  return extractConfidentText(data, 45);
+}
+
 async function runOcr(dataUrl){
   if(typeof Tesseract === 'undefined'){
     console.warn('[Stall Ledger] Tesseract.js failed to load — skipping OCR step.');
     return '';
   }
   try{
-    const result = await Tesseract.recognize(dataUrl, 'eng');
-    const text = (result && result.data && result.data.text) || '';
-    console.log('[Stall Ledger] OCR raw text:', text);
-    return text;
+    const preprocessed = await preprocessForOcr(dataUrl);
+    const inverted = await invertImageDataUrl(preprocessed);
+    const worker = await getOcrWorker();
+
+    const normalText = await runOcrPass(worker, preprocessed)
+      .catch(err => { console.warn('[Stall Ledger] OCR normal pass failed:', err); return ''; });
+    const invertedText = await runOcrPass(worker, inverted)
+      .catch(err => { console.warn('[Stall Ledger] OCR inverted pass failed:', err); return ''; });
+
+    console.log('[Stall Ledger] OCR text (normal pass, confidence-filtered):', normalText);
+    console.log('[Stall Ledger] OCR text (inverted pass, confidence-filtered):', invertedText);
+    return [normalText, invertedText].filter(Boolean).join('\n');
   }catch(err){
     console.warn('[Stall Ledger] OCR failed, continuing without it:', err);
     return '';
@@ -1028,10 +1258,150 @@ function cleanOcrText(rawText){
   return deduped.join('\n');
 }
 
+// Free OCR-only mode: turns cleaned OCR text into produce/price rows using pattern matching,
+// no AI call at all. Works best when each tag's name and price are close together in the text.
+function parseOcrTextToItems(cleanText){
+  if(!cleanText) return [];
+
+  const weightRe = /\$?\s?(\d+(?:\.\d{1,2})?)\s*\/\s*(lb|lbs|kg|oz|g|each|ea)\b/i;
+  const itemRe = /\$\s?(\d+(?:\.\d{1,2})?)\b/;
+
+  const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
+  const items = [];
+  let pendingNameParts = [];
+
+  function flush(priceItem, priceWeight){
+    const name = pendingNameParts.join(' ').replace(/\s{2,}/g, ' ').trim();
+    pendingNameParts = [];
+    if(name && (priceItem || priceWeight)){
+      items.push({ store: '', produce: name, priceItem: priceItem || '', priceWeight: priceWeight || '' });
+    }
+  }
+
+  lines.forEach(line => {
+    const weightMatch = line.match(weightRe);
+    const itemMatch = !weightMatch ? line.match(itemRe) : null;
+
+    if(weightMatch || itemMatch){
+      let remainder = line;
+      let priceItem = '', priceWeight = '';
+      if(weightMatch){
+        priceWeight = `$${weightMatch[1]}/${weightMatch[2].toLowerCase()}`;
+        remainder = remainder.replace(weightMatch[0], '');
+      } else if(itemMatch){
+        priceItem = `$${itemMatch[1]}`;
+        remainder = remainder.replace(itemMatch[0], '');
+      }
+      remainder = remainder.replace(/[-–—:|_]+/g, ' ').trim();
+      if(remainder.replace(/[^a-zA-Z]/g, '').length >= 2){
+        // Name and price appeared on the same line
+        pendingNameParts.push(remainder);
+      }
+      flush(priceItem, priceWeight);
+    } else if(line.replace(/[^a-zA-Z]/g, '').length >= 2){
+      // No price here — treat as (part of) the name for whichever price comes next
+      pendingNameParts.push(line);
+    }
+  });
+
+  return items;
+}
+
+// --- Photo optimization, applied to a copy used only for extraction (AI + OCR) ---
+// The original photo is still what's stored/shown in the ledger; this optimized
+// version just gives both extraction paths a cleaner image to read from.
+
+// Per-channel auto-levels: stretches each of R/G/B independently to the full 0-255
+// range, fixing washed-out or dim/underexposed photos while preserving tag colors.
+function applyAutoLevels(imageData){
+  const d = imageData.data;
+  let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+  for(let i = 0; i < d.length; i += 4){
+    if(d[i] < minR) minR = d[i]; if(d[i] > maxR) maxR = d[i];
+    if(d[i+1] < minG) minG = d[i+1]; if(d[i+1] > maxG) maxG = d[i+1];
+    if(d[i+2] < minB) minB = d[i+2]; if(d[i+2] > maxB) maxB = d[i+2];
+  }
+  const rangeR = Math.max(1, maxR - minR);
+  const rangeG = Math.max(1, maxG - minG);
+  const rangeB = Math.max(1, maxB - minB);
+  for(let i = 0; i < d.length; i += 4){
+    d[i]   = ((d[i]   - minR) / rangeR) * 255;
+    d[i+1] = ((d[i+1] - minG) / rangeG) * 255;
+    d[i+2] = ((d[i+2] - minB) / rangeB) * 255;
+  }
+}
+
+// Fast separable box blur (radius 1), used as the base for an unsharp mask.
+function boxBlur3(src, width, height){
+  const mid = new Float32Array(src.length);
+  for(let y = 0; y < height; y++){
+    for(let x = 0; x < width; x++){
+      const x0 = Math.max(0, x - 1), x1 = Math.min(width - 1, x + 1);
+      for(let c = 0; c < 3; c++){
+        const i0 = (y * width + x0) * 4 + c;
+        const i1 = (y * width + x) * 4 + c;
+        const i2 = (y * width + x1) * 4 + c;
+        mid[i1] = (src[i0] + src[i1] + src[i2]) / 3;
+      }
+    }
+  }
+  const out = new Float32Array(src.length);
+  for(let y = 0; y < height; y++){
+    const y0 = Math.max(0, y - 1), y1 = Math.min(height - 1, y + 1);
+    for(let x = 0; x < width; x++){
+      for(let c = 0; c < 3; c++){
+        const i0 = (y0 * width + x) * 4 + c;
+        const i1 = (y * width + x) * 4 + c;
+        const i2 = (y1 * width + x) * 4 + c;
+        out[i1] = (mid[i0] + mid[i1] + mid[i2]) / 3;
+      }
+    }
+  }
+  return out;
+}
+
+// Mild unsharp mask: sharpens edges (helps small price-tag text read more crisply)
+// without the harsh halos a strong sharpen filter would introduce.
+function applyUnsharpMask(imageData, width, height, amount){
+  const src = imageData.data;
+  const original = new Float32Array(src);
+  const blurred = boxBlur3(original, width, height);
+  for(let i = 0; i < src.length; i += 4){
+    for(let c = 0; c < 3; c++){
+      const orig = original[i + c];
+      const blur = blurred[i + c];
+      const val = orig + (orig - blur) * amount;
+      src[i + c] = val < 0 ? 0 : (val > 255 ? 255 : val);
+    }
+  }
+}
+
+function optimizePhotoForExtraction(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      applyAutoLevels(imageData);
+      applyUnsharpMask(imageData, canvas.width, canvas.height, 0.35);
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => reject(new Error('Could not optimize photo'));
+    img.src = dataUrl;
+  });
+}
+
 extractBtn.addEventListener('click', async () => {
   if(!selectedFile) return;
 
-  if(!llmConfig.apiKey){
+  if(extractionMode === 'ai' && !llmConfig.apiKey){
     statusMsg.textContent = 'First, connect an AI up top — it only takes a minute.';
     statusMsg.classList.add('err');
     settingsPanel.classList.add('open');
@@ -1042,59 +1412,76 @@ extractBtn.addEventListener('click', async () => {
   cameraBtn.disabled = true;
   libraryBtn.disabled = true;
   statusMsg.classList.remove('err');
-  statusMsg.textContent = 'Step 1/3: Extracting text with OCR…';
+  statusMsg.textContent = 'Enhancing photo…';
 
   try{
     const normalized = selectedFileDataUrl || await normalizeImage(selectedFile);
-    const base64 = normalized.full.split(',')[1];
+
+    // Optimize a copy for extraction only — the ledger still shows the original photo.
+    const optimizedFull = await optimizePhotoForExtraction(normalized.full)
+      .catch(err => { console.warn('[Stall Ledger] Photo optimization failed, using original:', err); return normalized.full; });
+    console.log('[Stall Ledger] Photo optimized for extraction (auto-levels + mild sharpen).');
+
+    const base64 = optimizedFull.split(',')[1];
     const mediaType = 'image/jpeg';
 
     // Step 1: extract raw text via OCR
     statusMsg.textContent = 'Step 1/3: Extracting text with OCR…';
-    const ocrRawText = await runOcr(normalized.full);
+    const ocrRawText = await runOcr(optimizedFull);
 
     // Step 2: trim the noise down to clean key facts
     statusMsg.textContent = 'Step 2/3: Cleaning up scanned text…';
     const ocrCleanText = cleanOcrText(ocrRawText);
-    console.log('[Stall Ledger] OCR cleaned text (sent to AI):', ocrCleanText);
+    console.log('[Stall Ledger] OCR cleaned text:', ocrCleanText);
 
-    // Step 3: send the optimized prompt (image + cleaned OCR hints) to the AI
-    statusMsg.textContent = 'Step 3/3: Reading shelf tags with AI…';
-    const promptText = buildExtractionPrompt(ocrCleanText);
-    console.log('[Stall Ledger] Final prompt sent to AI:\n' + promptText);
-    const aiResult = await extractWithConfiguredProvider(normalized.full, base64, mediaType, promptText);
-    const rawText = aiResult.text;
-    const usage = aiResult.usage;
-    console.log('[Stall Ledger] Raw AI response:', rawText);
-    if(usage){
-      console.log(`[Stall Ledger] Token usage — input: ${usage.inputTokens}, output: ${usage.outputTokens}, total: ${usage.inputTokens + usage.outputTokens}`);
-    } else {
-      console.log('[Stall Ledger] Token usage: not reported by this provider.');
-    }
-
-    let clean = rawText.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
     let parsed = null;
-    try{
-      parsed = JSON.parse(clean);
-    }catch(e){
-      // Fallback: the model may have added stray text around the JSON — pull out the array substring.
-      const match = clean.match(/\[[\s\S]*\]/);
-      if(match){
-        try{ parsed = JSON.parse(match[0]); }catch(e2){ parsed = null; }
+    let usage = null;
+
+    if(extractionMode === 'ocr'){
+      // Free mode: skip the AI entirely, parse the cleaned OCR text with pattern matching
+      statusMsg.textContent = 'Step 3/3: Matching names to prices…';
+      parsed = parseOcrTextToItems(ocrCleanText);
+      console.log('[Stall Ledger] OCR-only parsed items:', parsed);
+    } else {
+      // Step 3: send the optimized prompt (image + cleaned OCR hints) to the AI
+      statusMsg.textContent = 'Step 3/3: Reading shelf tags with AI…';
+      const promptText = buildExtractionPrompt(ocrCleanText);
+      console.log('[Stall Ledger] Final prompt sent to AI:\n' + promptText);
+      const aiResult = await extractWithConfiguredProvider(optimizedFull, base64, mediaType, promptText);
+      const rawText = aiResult.text;
+      usage = aiResult.usage;
+      console.log('[Stall Ledger] Raw AI response:', rawText);
+      if(usage){
+        console.log(`[Stall Ledger] Token usage — input: ${usage.inputTokens}, output: ${usage.outputTokens}, total: ${usage.inputTokens + usage.outputTokens}`);
+      } else {
+        console.log('[Stall Ledger] Token usage: not reported by this provider.');
       }
-    }
-    // Fallback: the model may have wrapped the array in an object, e.g. { "items": [...] }.
-    if(parsed && !Array.isArray(parsed)){
-      const arrayField = Object.values(parsed).find(v => Array.isArray(v));
-      parsed = arrayField || null;
-    }
-    if(!parsed){
-      console.warn('[Stall Ledger] Could not parse AI response as JSON:', rawText);
-      throw new Error('Could not parse the response — try again or switch providers');
+
+      let clean = rawText.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      try{
+        parsed = JSON.parse(clean);
+      }catch(e){
+        // Fallback: the model may have added stray text around the JSON — pull out the array substring.
+        const match = clean.match(/\[[\s\S]*\]/);
+        if(match){
+          try{ parsed = JSON.parse(match[0]); }catch(e2){ parsed = null; }
+        }
+      }
+      // Fallback: the model may have wrapped the array in an object, e.g. { "items": [...] }.
+      if(parsed && !Array.isArray(parsed)){
+        const arrayField = Object.values(parsed).find(v => Array.isArray(v));
+        parsed = arrayField || null;
+      }
+      if(!parsed){
+        console.warn('[Stall Ledger] Could not parse AI response as JSON:', rawText);
+        throw new Error('Could not parse the response — try again or switch providers');
+      }
     }
 
     if(!Array.isArray(parsed) || parsed.length === 0){
-      statusMsg.textContent = 'No readable prices found in that photo — try a clearer shot.';
+      statusMsg.textContent = extractionMode === 'ocr'
+        ? 'No clear name+price pairs found — try a closer, straighter shot of one or two tags.'
+        : 'No readable prices found in that photo — try a clearer shot.';
       statusMsg.classList.add('err');
     } else {
       const entered = todayStr();
@@ -1102,11 +1489,13 @@ extractBtn.addEventListener('click', async () => {
       const batchId = batchCounter++;
       lastBatchId = batchId;
       let missingStoreCount = 0;
+      const newlyAdded = [];
       parsed.forEach(p => {
         const storeVal = (p.store || '').trim();
         if(!storeVal) missingStoreCount++;
-        items.push({
+        const newItem = {
           id: idCounter++,
+          dbId: null,
           dateEntered: entered,
           dateEnteredISO: enteredISO,
           store: storeVal,
@@ -1117,9 +1506,12 @@ extractBtn.addEventListener('click', async () => {
           photoFullUrl: normalized.full,
           batchId: batchId,
           selected: false
-        });
+        };
+        items.push(newItem);
+        newlyAdded.push(newItem);
       });
       renderTable();
+      insertItemsToDb(newlyAdded);
       const usageNote = usage ? ` (${usage.inputTokens + usage.outputTokens} tokens used)` : '';
       statusMsg.textContent = `Added ${parsed.length} item${parsed.length===1?'':'s'} to the ledger.${usageNote}`;
 
@@ -1263,6 +1655,99 @@ exportXlsxBtn.addEventListener('click', () => {
   XLSX.writeFile(wb, `stall-ledger-${todayFileStamp()}.xlsx`);
 });
 
+// ---- Shared database helpers (Supabase) ----
+// All of these fail gracefully — if the DB isn't configured or a request fails,
+// the app keeps working locally; the shared save/sync is best-effort.
+
+async function loadSharedLedger(){
+  if(!supabaseClient) return;
+  setDbStatus('offline', '⚪ Connecting…');
+  try{
+    const { data, error } = await supabaseClient
+      .from('ledger_items')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if(error) throw error;
+
+    items = (data || []).map(row => ({
+      id: idCounter++,
+      dbId: row.id,
+      dateEntered: row.date_entered,
+      dateEnteredISO: row.date_entered_iso,
+      store: row.store || '',
+      produce: row.produce || '',
+      priceItem: row.price_item || '',
+      priceWeight: row.price_weight || '',
+      photoUrl: null,
+      photoFullUrl: null,
+      batchId: null,
+      selected: false
+    }));
+    renderTable();
+    setDbStatus('connected', `☁ Shared ledger connected — ${items.length} item${items.length===1?'':'s'} loaded`);
+  }catch(err){
+    console.warn('[Stall Ledger] Could not load shared ledger:', err);
+    const isPermissionDenied = err && (err.code === '42501' || /permission denied|row-level security/i.test(err.message || ''));
+    if(isPermissionDenied){
+      setDbStatus('offline', '🔒 Scans are saved — full ledger is admin-only');
+    } else {
+      setDbStatus('error', '⚠ Could not reach shared database — working locally');
+    }
+  }
+}
+
+async function insertItemsToDb(newItems){
+  if(!supabaseClient) return;
+  try{
+    const rows = newItems.map(i => ({
+      store: i.store,
+      produce: i.produce,
+      price_item: i.priceItem,
+      price_weight: i.priceWeight,
+      date_entered: i.dateEntered,
+      date_entered_iso: i.dateEnteredISO
+    }));
+    const { data, error } = await supabaseClient.from('ledger_items').insert(rows).select();
+    if(error) throw error;
+    // Attach the generated DB ids back onto the local items so later edits/deletes can target them.
+    (data || []).forEach((row, idx) => { if(newItems[idx]) newItems[idx].dbId = row.id; });
+    setDbStatus('connected', '☁ Saved to shared ledger');
+  }catch(err){
+    console.warn('[Stall Ledger] Could not save new items to shared ledger:', err);
+    setDbStatus('error', '⚠ Saved locally only — could not reach shared database');
+  }
+}
+
+async function updateStoreInDb(dbId, store){
+  if(!supabaseClient || !dbId) return;
+  try{
+    const { error } = await supabaseClient.from('ledger_items').update({ store }).eq('id', dbId);
+    if(error) throw error;
+  }catch(err){
+    console.warn('[Stall Ledger] Could not update store name in shared ledger:', err);
+  }
+}
+
+async function deleteItemsFromDb(dbIds){
+  if(!supabaseClient || !dbIds.length) return;
+  try{
+    const { error } = await supabaseClient.from('ledger_items').delete().in('id', dbIds);
+    if(error) throw error;
+  }catch(err){
+    console.warn('[Stall Ledger] Could not delete items from shared ledger:', err);
+  }
+}
+
+async function deleteAllFromDb(){
+  if(!supabaseClient) return;
+  try{
+    const { error } = await supabaseClient.from('ledger_items').delete().gte('id', 0);
+    if(error) throw error;
+  }catch(err){
+    console.warn('[Stall Ledger] Could not clear shared ledger:', err);
+  }
+}
+
 function renderTable(){
   ledgerBody.innerHTML = '';
   if(items.length === 0){
@@ -1345,6 +1830,7 @@ function startEditStore(cell){
     committed = true;
     item.store = input.value.trim();
     renderTable();
+    updateStoreInDb(item.dbId, item.store);
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (ev) => {
@@ -1365,14 +1851,16 @@ lightbox.addEventListener('click', () => {
 applyStoreOneBtn.addEventListener('click', () => {
   const name = storeNameInput.value.trim();
   if(!name) return;
+  const changed = [];
   if(storePromptMode === 'selected'){
-    items.forEach(i => { if(i.selected) i.store = name; });
+    items.forEach(i => { if(i.selected){ i.store = name; changed.push(i); } });
   } else {
     if(lastBatchId === null) return;
-    items.forEach(i => { if(i.batchId === lastBatchId && !i.store) i.store = name; });
+    items.forEach(i => { if(i.batchId === lastBatchId && !i.store){ i.store = name; changed.push(i); } });
   }
   storePrompt.classList.remove('open');
   renderTable();
+  changed.forEach(i => updateStoreInDb(i.dbId, i.store));
 });
 
 applyStoreAllBtn.addEventListener('click', () => {
@@ -1381,6 +1869,7 @@ applyStoreAllBtn.addEventListener('click', () => {
   items.forEach(i => { i.store = name; });
   storePrompt.classList.remove('open');
   renderTable();
+  items.forEach(i => updateStoreInDb(i.dbId, i.store));
 });
 
 dismissStoreBtn.addEventListener('click', () => {
@@ -1404,16 +1893,25 @@ selectAll.addEventListener('change', () => {
 });
 
 removeSelectedBtn.addEventListener('click', () => {
+  const idsToDelete = items.filter(i => i.selected && i.dbId).map(i => i.dbId);
   items = items.filter(i => !i.selected);
   selectAll.checked = false;
   renderTable();
+  if(idsToDelete.length) deleteItemsFromDb(idsToDelete);
 });
 
 removeAllBtn.addEventListener('click', () => {
+  if(supabaseClient){
+    const confirmed = window.confirm(
+      'This will permanently delete the SHARED ledger for everyone using this site, not just your own view. This cannot be undone. Continue?'
+    );
+    if(!confirmed) return;
+  }
   items = [];
   selectAll.checked = false;
   storePrompt.classList.remove('open');
   renderTable();
+  deleteAllFromDb();
 });
 
 function updateBulkControls(){
@@ -1430,6 +1928,7 @@ function updateBulkControls(){
 
 renderTable();
 settingsPanel.classList.add('open');
+loadSharedLedger();
 </script>
 </body>
 </html>
